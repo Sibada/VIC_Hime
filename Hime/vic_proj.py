@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from .version import version as __version__
 from collections import OrderedDict
 import datetime
 import json
@@ -18,6 +19,33 @@ class VicProj(object):
         prj_prm["proj_path"] = proj_path
         prj_prm["proj_name"] = proj_name
         prj_prm["proj_file"] = proj_path + "/" + proj_name + ".vic_proj"
+        prj_prm["global_file"] = proj_path + "/" + proj_name + "_image.global.txt"
+
+        prj_prm["vic_image_driver"] = None
+        prj_prm["n_cores"] = 4
+
+        # Creater parameters
+        creater_params = OrderedDict()
+        creater_params["n_layers"] = 3
+        creater_params["n_rootzones"] = 3
+        creater_params["snow_band"] = 5
+        creater_params["veg_class"] = 12
+        creater_params["soil_file"] = None
+        creater_params["veg_file"] = None
+        creater_params["veg_lib_file"] = None
+        creater_params["params_file"] = None
+        creater_params["domain_file"] = None
+
+        creater_params["decimal"] = 4
+
+        prj_prm["creater_params"] = creater_params
+
+        # Routing parameters
+        rout_params = OrderedDict()
+        rout_params["uh_file"] = None
+        rout_params["sim_file"] = None
+        rout_params["obs_file"] = None
+        prj_prm["rout_params"] = rout_params
 
         #######################################################################
         # VIC global parameters.
@@ -34,6 +62,7 @@ class VicProj(object):
         glo_prm["full_energy"] = "FALSE"
         glo_prm["frozen_soil"] = "FALSE"
 
+        glo_prm["compute_treeline"] = "FALSE"
         # Domain file.
         domain = OrderedDict({
             "file_path":"domain file path",
@@ -87,12 +116,12 @@ class VicProj(object):
         glo_prm["out_file"] = [out_file1]
 
     ####################################################################################################################
-    '''
+    """
     Write global parameters file for VIC Image Driver.
-    '''
-    def write_global_file(self, out_global_file):
+    """
+    def write_global_file(self, out_global_file=None):
         if out_global_file is None:
-            out_global_file = self.proj_params["proj_file"]
+            out_global_file = self.proj_params["global_file"]
 
         out_lines = []
         glo_prm = self.global_params
@@ -100,7 +129,7 @@ class VicProj(object):
         out_lines.append("#######################################################################")
         out_lines.append("# VIC Model Parameters for Stehekin Basin Sample Image Driver Setup")
         out_lines.append("#")
-        out_lines.append("# This file is create by VIC Hime %s at %s" % ("", datetime.datetime.now().
+        out_lines.append("# This file is create by VIC Hime %s at %s" % (__version__, datetime.datetime.now().
                                                                          strftime('%Y-%m-%d, %H:%M:%S')))
         out_lines.append("#######################################################################")
         out_lines.append("")
@@ -122,6 +151,8 @@ class VicProj(object):
         out_lines.append("")
         out_lines.append("FULL_ENERGY %s" % glo_prm["full_energy"])
         out_lines.append("FROZEN_SOIL %s" % glo_prm["frozen_soil"])
+        out_lines.append("")
+        out_lines.append("COMPUTE_TREELINE %s" % glo_prm["compute_treeline"])
 
         out_lines.append("#######################################################################")
         out_lines.append("# DOMAIN INFO")
@@ -190,7 +221,7 @@ class VicProj(object):
     '''
     Write out project parameters file.
     '''
-    def write_proj_file(self, out_proj_file):
+    def write_proj_file(self, out_proj_file = None):
         glo_prm_cp = self.global_params.copy()
         glo_prm_cp["start_time"] = glo_prm_cp["start_time"].strftime('%Y-%m-%d %H:%M:%S')
         glo_prm_cp["end_time"] = glo_prm_cp["end_time"].strftime('%Y-%m-%d %H:%M:%S')
@@ -215,11 +246,11 @@ class VicProj(object):
     def read_proj_file(self, proj_file):
 
         pf = open(proj_file, "r")
-        proj_text = pf.readlines()
+        proj_str = pf.readlines()
         pf.close()
 
-        proj_text = "".join(proj_text)
-        proj = json.loads(proj_text, object_pairs_hook=OrderedDict)
+        proj_str = "".join(proj_str)
+        proj = json.loads(proj_str, object_pairs_hook=OrderedDict)
 
         self.proj_params = proj["proj_params"]
         self.global_params = proj["global_params"]
@@ -227,11 +258,27 @@ class VicProj(object):
                                                                       '%Y-%m-%d %H:%M:%S')
         self.global_params["end_time"] = datetime.datetime.strptime(self.global_params["end_time"],
                                                                     '%Y-%m-%d %H:%M:%S')
+        return self
 
-############################################## Test.
-if __name__ == "__main__":
-    vp = VicProj("just_tst", "E:/VIC_sample_data-master/image/Stehekin/parameters")
-    vp.write_global_file("E:/VIC_sample_data-master/image/Stehekin/parameters/global_tst.txt")
-    vp.write_proj_file(None)
-    vp.read_proj_file("E:/VIC_sample_data-master/image/Stehekin/parameters/just_tst.vic_proj")
-    vp.write_proj_file(None)
+    ####################################################################################################################
+    #
+    # Getter & Setters.
+    #
+    ####################################################################################################################
+    def get_rout_param(self):
+        return self.proj_params["rout_params"]
+
+    def set_soil_file(self,soil_file):
+        self.proj_params["creater_params"]["soil_file"] = soil_file
+
+    def set_veg_file(self,veg_file):
+        self.proj_params["creater_params"]["veg_file"] = veg_file
+
+    def set_veg_lib_file(self, veg_lib_file):
+        self.proj_params["creater_params"]["veg_lib_file"] = veg_lib_file
+
+    def set_out_params_file(self, params_file):
+        self.proj_params["creater_params"]["params_file"] = params_file
+
+    def set_out_domain_file(self, domain_file):
+        self.proj_params["creater_params"]["domain_file"] = domain_file

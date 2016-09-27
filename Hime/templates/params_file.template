@@ -1,0 +1,412 @@
+{
+    "dimensions": [
+        {
+            "dimension": "lon", 
+            "variable": "lon", 
+            "format": "double", 
+            "units": "degrees_east", 
+            "long_name": "Longitude of grid cell center"
+        }, 
+        {
+            "dimension": "lat", 
+            "variable": "lat", 
+            "format": "double", 
+            "units": "degrees_north", 
+            "long_name": "Latitude of grid cell center"
+        }, 
+        {
+            "dimension": "nlayer", 
+            "variable": "layer", 
+            "format": "int",
+            "units": "N/A", 
+            "long_name": "soil_layer"
+        }, 
+        {
+            "dimension": "snow_band", 
+            "variable": "snow_band", 
+            "format": "int",
+            "units": "N/A", 
+            "long_name": "snow band"
+        }, 
+        {
+            "dimension": "veg_class", 
+            "variable": "veg_class", 
+            "format": "int",
+            "units": "N/A", 
+            "long_name": "Vegetation Class"
+        }, 
+        {
+            "dimension": "root_zone", 
+            "variable": "root_zone", 
+            "format": "int",
+            "units": "N/A", 
+            "long_name": "root zone"
+        }, 
+        {
+            "dimension": "month", 
+            "variable": "month", 
+            "format": "int",
+            "units": "N/A", 
+            "long_name": "month of year"
+        }
+    ], 
+    "variables": [
+        {
+            "variable": "run_cell", 
+            "units": "N/A", 
+            "format": "int", 
+            "description": "1 = Run Grid Cell, 0 = Do Not Run", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "gridcel", 
+            "units": "N/A", 
+            "format": "int", 
+            "description": "Grid cell number", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "lats", 
+            "units": "degrees", 
+            "format": "double", 
+            "description": "Latitude of grid cell", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "lons", 
+            "units": "degrees", 
+            "format": "double", 
+            "description": "Longitude of grid cell", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "infilt", 
+            "units": "N/A", 
+            "format": "double", 
+            "description": "Variable infiltration curve parameter (binfilt)", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "Ds", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Fraction of Dsmax where non-linear baseflow begins", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "Dsmax", 
+            "units": "mm/day", 
+            "format": "double", 
+            "description": "Maximum velocity of baseflow", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "Ws", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Fraction of maximum soil moisture where non-linear baseflow occurs", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "c", 
+            "units": "N/A", 
+            "format": "double", 
+            "description": "Exponent used in baseflow curve, normally set to 2", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "expt", 
+            "units": "N/A", 
+            "format": "double", 
+            "description": "Exponent n (=3+2/lambda) in Campbell's eqn for hydraulic conductivity, HBH 5.6 (where lambda = soil pore size distribution parameter). Values should be > 3.0.", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "Ksat", 
+            "units": "mm/day", 
+            "format": "double", 
+            "description": "Saturated hydrologic conductivity", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "phi_s", 
+            "units": "mm/mm", 
+            "format": "double", 
+            "description": "Soil moisture diffusion parameter", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "init_moist", 
+            "units": "mm", 
+            "format": "double", 
+            "description": "Initial layer moisture content", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "elev", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Average elevation of grid cell", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "depth", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Thickness of each soil moisture layer", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "avg_T", 
+            "units": "C", 
+            "format": "double", 
+            "description": "Average soil temperature, used as the bottom boundary for soil heat flux solutions", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "dp", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Soil thermal damping depth (depth at which soil temperature remains constant through the year, ~4 m)", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "bubble", 
+            "units": "cm", 
+            "format": "double", 
+            "description": "Bubbling pressure of soil. Values should be >0.", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "quartz", 
+            "units": "N/A", 
+            "format": "double", 
+            "description": "Quartz content of soil", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "bulk_density", 
+            "units": "kg/m3", 
+            "format": "double", 
+            "description": "Bulk density of soil layer", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "soil_density", 
+            "units": "kg/m3", 
+            "format": "double", 
+            "description": "Soil particle density, normally 2685 kg/m3", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "organic (optional)", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Fraction of soil layer that is organic.", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "bulk_dens_org (optional)", 
+            "units": "kg/m3", 
+            "format": "double", 
+            "description": "Bulk density of organic portion of soil.", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "soil_dens_org (optional)", 
+            "units": "kg/m3", 
+            "format": "double", 
+            "description": "Soil particle density of organic portion of soil, normally 1300 kg/m3.", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "off_gmt", 
+            "units": "hours", 
+            "format": "double", 
+            "description": "Time zone offset from GMT. This parameter determines how VIC interprets sub-daily time steps relative to the model start date and time.", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "Wcr_FRACT", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Fractional soil moisture content at the critical point(~70% of field capacity) (fraction of maximum moisture)", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "Wpwp_FRACT", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Fractional soil moisture content at the wilting point(fraction of maximum moisture)", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "rough", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Surface roughness of bare soil", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "snow_rough", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Surface roughness of snowpack", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "annual_prec", 
+            "units": "mm", 
+            "format": "double", 
+            "description": "Average annual precipitation", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "resid_moist", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Soil moisture layer residual moisture", 
+            "n_value": "Nlayer"
+        }, 
+        {
+            "variable": "fs_active", 
+            "units": "1 or 0", 
+            "format": "int", 
+            "description": "If set to 1, then frozen soil algorithm is activated for the grid cell. A 0 indicates that frozen soils are not computed even if soil temperatures fall below 0C.", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "frost_slope", 
+            "units": "C", 
+            "format": "double", 
+            "description": "Slope of uniform distribution of soil temperature (if SPATIAL_FROST == TRUE in the global parameter file).", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "max_snow_distrib_slope", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Maximum slope of the snow depth distribution.", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "July_Tavg", 
+            "units": "C", 
+            "format": "double", 
+            "description": "Average July air temperature, used for treeline computations.", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "Nveg", 
+            "units": "N/A", 
+            "format": "int", 
+            "description": "Number of vegetation tiles in the grid cell", 
+            "n_value": "1"
+        }, 
+        {
+            "variable": "Cv", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Fraction of grid cell covered by vegetation tile", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "root_depth", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Root zone thickness (sum of depths is total depth of root penetration)", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "root_fract", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Fraction of root in the current root zone.", 
+            "n_value": "veg_class"
+        },
+        {
+            "variable": "overstory", 
+            "units": "N/A", 
+            "format": "int", 
+            "description": "Flag to indicate whether or not the current vegetation type has an overstory (TRUE for overstory present [e.g. trees], FALSE for overstory not present [e.g. grass])", 
+            "n_value": "veg_class"
+        },
+        {
+            "variable": "rarc", 
+            "units": "s/m", 
+            "format": "double", 
+            "description": "Architectural resistance of vegetation type (~2 s/m)", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "rmin", 
+            "units": "s/m", 
+            "format": "double", 
+            "description": "Minimum stomatal resistance of vegetation type (~100 s/m)", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "LAI", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Leaf-area index of vegetation type", 
+            "n_value": "veg_class*12"
+        }, 
+        {
+            "variable": "albedo", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Shortwave albedo for vegetation type", 
+            "n_value": "veg_class*12"
+        }, 
+        {
+            "variable": "veg_rough", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Vegetation roughness length (typically 0.123 * vegetation height)", 
+            "n_value": "veg_class*12"
+        }, 
+        {
+            "variable": "displacement", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Vegetation displacement height (typically 0.67 * vegetation height)", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "wind_h", 
+            "units": "m", 
+            "format": "double", 
+            "description": "Height at which wind speed is measured. If using snow interception routines please read the documentation on wind_h.", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "RGL", 
+            "units": "W/m2", 
+            "format": "double", 
+            "description": "Minimum incoming shortwave radiation at which there will be transpiration. For trees this is about 30 W/m2, for crops about 100 W/m2.", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "rad_atten", 
+            "units": "fract", 
+            "format": "double", 
+            "description": "Radiation attenuation factor. Normally set to 0.5, though may need to be adjusted for high latitudes.", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "wind_atten", 
+            "units": "fract", 
+            "format": "double", 
+            "description": "Wind speed attenuation through the overstory. The default value has been 0.5.", 
+            "n_value": "veg_class"
+        }, 
+        {
+            "variable": "trunk_ratio", 
+            "units": "fract", 
+            "format": "double", 
+            "description": "Ratio of total tree height that is trunk (no branches). The default value has been 0.2.", 
+            "n_value": "veg_class"
+        }
+    ]
+}
