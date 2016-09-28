@@ -24,7 +24,7 @@ class VicProj(object):
         prj_prm["vic_image_driver"] = None
         prj_prm["n_cores"] = 4
 
-        # Creater parameters
+        #################################################### Creater parameters
         creater_params = OrderedDict()
         creater_params["n_layers"] = 3
         creater_params["n_rootzones"] = 3
@@ -38,9 +38,24 @@ class VicProj(object):
 
         creater_params["decimal"] = 4
 
+        # Forcings.
+        creater_params["forcing_date"] = datetime.datetime(1949, 1, 1)
+        creater_params["temp_file"] = None
+        creater_params["prec_file"] = None
+        creater_params["press_file"] = None
+        creater_params["swdown_file"] = None
+        creater_params["lwdown_file"] = None
+        creater_params["vp_file"] = None
+        creater_params["wind_file"] = None
+        creater_params["sh_file"] = None
+        creater_params["stn_coords_file"] = None
+
+        creater_params["use_sh"] = False
+        creater_params["forcing_file"] = None
+
         prj_prm["creater_params"] = creater_params
 
-        # Routing parameters
+        ##################################################### Routing parameters
         rout_params = OrderedDict()
         rout_params["uh_file"] = None
         rout_params["sim_file"] = None
@@ -63,6 +78,7 @@ class VicProj(object):
         glo_prm["frozen_soil"] = "FALSE"
 
         glo_prm["compute_treeline"] = "FALSE"
+        glo_prm["veglib_vegcover"] = "FALSE"
         # Domain file.
         domain = OrderedDict({
             "file_path":"domain file path",
@@ -223,10 +239,14 @@ class VicProj(object):
     '''
     def write_proj_file(self, out_proj_file = None):
         glo_prm_cp = self.global_params.copy()
+        prj_prm_cp = self.proj_params.copy()
         glo_prm_cp["start_time"] = glo_prm_cp["start_time"].strftime('%Y-%m-%d %H:%M:%S')
         glo_prm_cp["end_time"] = glo_prm_cp["end_time"].strftime('%Y-%m-%d %H:%M:%S')
+        prj_prm_cp["creater_params"]["forcing_date"] = \
+            prj_prm_cp["creater_params"]["forcing_date"].strftime('%Y-%m-%d %H:%M:%S')
+
         proj = OrderedDict({
-            "proj_params": self.proj_params,
+            "proj_params": prj_prm_cp,
             "global_params": glo_prm_cp
         })
 
@@ -258,6 +278,9 @@ class VicProj(object):
                                                                       '%Y-%m-%d %H:%M:%S')
         self.global_params["end_time"] = datetime.datetime.strptime(self.global_params["end_time"],
                                                                     '%Y-%m-%d %H:%M:%S')
+        self.proj_params["creater_params"]["forcing_date"] = \
+            datetime.datetime.strptime(self.proj_params["creater_params"]["forcing_date"],'%Y-%m-%d %H:%M:%S')
+
         return self
 
     ####################################################################################################################

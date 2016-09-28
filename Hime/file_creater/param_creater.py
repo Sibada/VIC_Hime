@@ -9,6 +9,7 @@ from Hime.version import version as __version__
 from Hime.vic_proj import VicProj
 from Hime import templates_path
 from collections import OrderedDict
+from math import pi, sin, cos
 import netCDF4 as nc
 import numpy as np
 import pandas as pd
@@ -16,13 +17,27 @@ import re, json
 import os, sys
 import datetime
 
+########################################################################################################################
+#
+# Read output information template file.
+#
+########################################################################################################################
 def read_template(template_file):
     tf = open(template_file)
-    tem_str = "".join(tf.readlines())
+    tem_lines = tf.readlines()
     tf.close()
-    tem = json.loads(tem_str, object_pairs_hook=OrderedDict)
+    try:
+        tem_str = "".join(tem_lines)
+        tem = json.loads(tem_str, object_pairs_hook=OrderedDict)
+    except Exception:
+        raise ValueError("Format of parameter template file uncorrect.")
     return tem
 
+########################################################################################################################
+#
+# Read classic soil parameters file.
+#
+########################################################################################################################
 def read_soil_file(proj, soil_path=None):
     creater_params=proj.proj_params["creater_params"]
     n_layer = creater_params["n_layers"]
@@ -43,6 +58,11 @@ def read_soil_file(proj, soil_path=None):
 
     return soil
 
+########################################################################################################################
+#
+# Read classic vegetation parameters file.
+#
+########################################################################################################################
 def read_veg_file(proj, veg_path=None):
     creater_params=proj.proj_params["creater_params"]
     n_rz = creater_params["n_rootzones"]
@@ -77,6 +97,11 @@ def read_veg_file(proj, veg_path=None):
 
     return veg
 
+########################################################################################################################
+#
+# Read classic veg lib parameters file.
+#
+########################################################################################################################
 def read_veg_lib(proj, veg_lib_path=None):
     if veg_lib_path is None:
         veg_lib_path = proj.proj_params["creater_params"]["veg_lib_file"]
@@ -86,7 +111,12 @@ def read_veg_lib(proj, veg_lib_path=None):
 
     return veg_lib
 
-def create_params_file(proj, out_params_path=None):
+########################################################################################################################
+#
+# Create parameters file and domain file which VIC Image Driver needs.
+#
+########################################################################################################################
+def create_params_file(proj, out_params_path=None, out_domain_path=None):
     creater_params=proj.proj_params["creater_params"]
 
     snow_band = creater_params["snow_band"]
@@ -95,6 +125,7 @@ def create_params_file(proj, out_params_path=None):
     n_layer = creater_params["n_layers"]
     organic = proj.global_params["organic"]
     compute_treeline = proj.global_params["compute_treeline"]
+    veglib_vegcover = proj.global_params["veglib_vegcover"]
 
     soil = read_soil_file(proj)
     veg = read_veg_file(proj)
@@ -105,11 +136,16 @@ def create_params_file(proj, out_params_path=None):
 
     if out_params_path is None:
         out_params_path = creater_params["params_file"]
+    if out_domain_path is None:
+        out_domain_path = creater_params["domain_file"]
 
     lons_value, lats_value, cellsize, sn = make_grid(proj, np.array(soil[3]), np.array(soil[2]))
     nx = len(lons_value)
     ny = len(lats_value)
 
+    #######################################################################
+    # Write parameters file.
+    #######################################################################
     params = nc.Dataset(out_params_path, "w", "NETCDF4")
     print out_params_path
 
@@ -160,14 +196,13 @@ def create_params_file(proj, out_params_path=None):
         v.units = variable["units"]
 
         print "Write "+variable["variable"]
+        value = np.zeros(nx * ny) -9999
         if n_value == "Nlayer":
             for l in range(n_layer):
-                value = np.zeros(nx * ny) -9999
                 value[sn] = np.array(soil[col])
                 v[l,:] = value
                 col += 1
         else:
-            value = np.zeros(nx * ny) -9999
             value[sn] = np.array(soil[col])
             v[:] = value
             col += 1
@@ -188,8 +223,8 @@ def create_params_file(proj, out_params_path=None):
         v.units = variable["units"]
 
         print "Write " + variable["variable"]
+        value = np.zeros(nx * ny) -9999
         if varname == "Nveg":
-            value = np.zeros(nx * ny) -9999
             value[sn] = np.array([len(vegs) for vegs in veg.values()])
             v[:] = value
 
@@ -200,7 +235,6 @@ def create_params_file(proj, out_params_path=None):
                     for veg_info in veg[cell]:
                         if veg_info["veg_class"] == cla:
                             cv[cell-1] = veg_info["Cv"]
-                value = np.zeros(nx * ny) -9999
                 value[sn] = cv
                 v[cla, :] = value
 
@@ -212,7 +246,6 @@ def create_params_file(proj, out_params_path=None):
                         for veg_info in veg[cell]:
                             if veg_info["veg_class"] == cla:
                                 rd[cell-1] = veg_info["root_depth"][rz]
-                    value = np.zeros(nx * ny) -9999
                     value[sn] = rd
                     v[cla, rz, :] = value
 
@@ -224,20 +257,19 @@ def create_params_file(proj, out_params_path=None):
                         for veg_info in veg[cell]:
                             if veg_info["veg_class"] == cla:
                                 rf[cell-1] = veg_info["root_fract"][rz]
-                    value = np.zeros(nx * ny) -9999
                     value[sn] = rf
                     v[cla, rz, :] = value
 
     # Write vegetation library part of parameters file.
-    veg_lib_part = range(39,51)
+    veg_lib_part = range(39,52)
+    if veglib_vegcover == "FALSE":
+        veg_lib_part.remove(43)
     col = 0
     for i in veg_lib_part:
         variable = variables[i]
         n_value = variable["n_value"]
         if variable["format"] == "int": datatype = "i4"
-        if variable["format"] == "double":
-            datatype = "f8"
-        print "Write " + variable["variable"]
+        if variable["format"] == "double":datatype = "f8"
 
         if n_value == "veg_class":
             dim = ("veg_class", "lat", "lon")
@@ -247,6 +279,7 @@ def create_params_file(proj, out_params_path=None):
         v.description = variable["description"]
         v.units = variable["units"]
 
+        print "Write " + variable["variable"]
         value = np.zeros(nx * ny) -9999
         if n_value == "veg_class":
             for cla in range(veg_class):
@@ -265,10 +298,59 @@ def create_params_file(proj, out_params_path=None):
 
     params.description = "VIC parameter file created by VIC Hime " + __version__ + " at " +  datetime.datetime.now().\
         strftime('%Y-%m-%d, %H:%M:%S')
-
-
     params.close()
 
+    #######################################################################
+    # Write domain file.
+    #######################################################################
+    print "Write domain file"
+    domain = nc.Dataset(out_domain_path, "w", "NETCDF4")
+
+    domain.createDimension("lon", nx)
+    domain.createDimension("lat", ny)
+
+    domain_vars = params_tem["domain"]
+
+    value = np.zeros(nx * ny)
+    for domain_var in domain_vars:
+        varname = domain_var["variable"]
+        if variable["format"] == "int": datatype = "i4"
+        if variable["format"] == "double":datatype = "f8"
+
+        if varname == "lon": dim = ("lon")
+        elif varname == "lat": dim = ("lat")
+        else: dim = ("lat", "lon")
+        v = domain.createVariable(varname, datatype, dim, fill_value=0)
+        v.units = domain_var["units"]
+        v.long_name = domain_var["long_name"]
+
+        if varname == "lon":
+            v[:] = lons_value
+            v.axis = "X"
+        if varname == "lat":
+            v[:] = lats_value
+            v.axis = "Y"
+        if varname == "frac":
+            value[sn] = np.zeros(ncell) +1.0
+            v[:] = value
+        if varname == "mask":
+            value[sn] = np.zeros(ncell) +1
+            v[:] = value
+        if varname == "area":
+            lats = np.array(soil[2])
+            areas = 2 *(cellsize*pi/180)*6371393*6371393*np.array(map(cos, lats*pi/180))*sin(cellsize*pi/360);
+            value[sn] = areas
+            v[:] = value
+
+        domain.description = "VIC domain file created by VIC Hime " + __version__ + " at " +  datetime.datetime.now().\
+        strftime('%Y-%m-%d, %H:%M:%S')
+    domain.close()
+
+########################################################################################################################
+#
+# Transfer coordinates to grids information.
+#
+########################################################################################################################
 def make_grid(proj, lon, lat):
     dec = proj.proj_params["creater_params"]["decimal"]
     lon_uni = np.unique(np.round(lon, dec))

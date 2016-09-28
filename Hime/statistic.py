@@ -12,6 +12,3 @@ def nmse(obs, sim):
 
 def bias(obs, sim):
     return sim.sum() / obs.sum() - 1
-
-def babs(obs, sim):
-    return abs(bias(obs, sim))

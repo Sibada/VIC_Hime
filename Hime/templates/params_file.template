@@ -175,7 +175,7 @@
             "units": "cm", 
             "format": "double", 
             "description": "Bubbling pressure of soil. Values should be >0.", 
-            "n_value": "1"
+            "n_value": "Nlayer"
         }, 
         {
             "variable": "quartz", 
@@ -199,21 +199,21 @@
             "n_value": "Nlayer"
         }, 
         {
-            "variable": "organic (optional)", 
+            "variable": "organic", 
             "units": "fraction", 
             "format": "double", 
             "description": "Fraction of soil layer that is organic.", 
             "n_value": "Nlayer"
         }, 
         {
-            "variable": "bulk_dens_org (optional)", 
+            "variable": "bulk_dens_org", 
             "units": "kg/m3", 
             "format": "double", 
             "description": "Bulk density of organic portion of soil.", 
             "n_value": "Nlayer"
         }, 
         {
-            "variable": "soil_dens_org (optional)", 
+            "variable": "soil_dens_org", 
             "units": "kg/m3", 
             "format": "double", 
             "description": "Soil particle density of organic portion of soil, normally 1300 kg/m3.", 
@@ -353,6 +353,13 @@
             "n_value": "veg_class*12"
         }, 
         {
+            "variable": "VEGCOVER", 
+            "units": "fraction", 
+            "format": "double", 
+            "description": "Partial vegetation cover fraction", 
+            "n_value": "veg_class*12"
+        }, 
+        {
             "variable": "albedo", 
             "units": "fraction", 
             "format": "double", 
@@ -407,6 +414,38 @@
             "format": "double", 
             "description": "Ratio of total tree height that is trunk (no branches). The default value has been 0.2.", 
             "n_value": "veg_class"
+        }
+    ],
+    "domain": [
+        {
+            "variable": "lon", 
+            "units": "degrees_north", 
+            "format": "double", 
+            "long_name": "latitude of grid cell center"
+        },
+        {
+            "variable": "lat", 
+            "units": "degrees_south", 
+            "format": "double", 
+            "long_name": "longtitude of grid cell center"
+        },
+        {
+            "variable": "area", 
+            "units": "m2", 
+            "format": "double", 
+            "long_name": "area of gird cell"
+        },
+        {
+            "variable": "frac", 
+            "units": "N/A", 
+            "format": "double", 
+            "long_name": "fraction of grid cell that is active"
+        },
+        {
+            "variable": "mask", 
+            "units": "N/A", 
+            "format": "int", 
+            "long_name": "fraction of grid cell that is activedomain mask"
         }
     ]
 }
