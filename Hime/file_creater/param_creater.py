@@ -88,8 +88,9 @@ def read_veg_file(proj, veg_path=None):
             sub_line_split = re.split("[\s\r\t\n]",line.strip())
             veg_info = OrderedDict({"veg_class":int(sub_line_split[0])})
             veg_info.update({"Cv":float(sub_line_split[1])})
-            veg_info.update({"root_depth":[float(r) for r in sub_line_split[2:n_rz + 2]]})
-            veg_info.update({"root_fract":[float(r) for r in sub_line_split[n_rz + 2:2*n_rz + 2]]})
+            sub_line_split = np.array(sub_line_split)
+            veg_info.update({"root_depth":[float(r) for r in sub_line_split[range(2, n_rz*2+2, 2)]]})
+            veg_info.update({"root_fract":[float(r) for r in sub_line_split[range(3, n_rz*2+3, 2)]]})
 
             vegcs.append(veg_info)
             l += 1
@@ -296,6 +297,11 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
                     v[cla, month, :] = value
                 col += 1
 
+    v = params.createVariable("mask", "i4", ("lat", "lon"))
+    value = np.zeros(nx * ny) -9999
+    value[sn] = np.zeros(ncell) + 1
+    v[:] = value
+
     params.description = "VIC parameter file created by VIC Hime " + __version__ + " at " +  datetime.datetime.now().\
         strftime('%Y-%m-%d, %H:%M:%S')
     params.close()
@@ -314,13 +320,13 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
     value = np.zeros(nx * ny)
     for domain_var in domain_vars:
         varname = domain_var["variable"]
-        if variable["format"] == "int": datatype = "i4"
-        if variable["format"] == "double":datatype = "f8"
+        if domain_var["format"] == "int": datatype = "i4"
+        if domain_var["format"] == "double":datatype = "f8"
 
         if varname == "lon": dim = ("lon")
         elif varname == "lat": dim = ("lat")
         else: dim = ("lat", "lon")
-        v = domain.createVariable(varname, datatype, dim, fill_value=0)
+        v = domain.createVariable(varname, datatype, dim, fill_value = 0)
         v.units = domain_var["units"]
         v.long_name = domain_var["long_name"]
 
@@ -334,7 +340,7 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
             value[sn] = np.zeros(ncell) +1.0
             v[:] = value
         if varname == "mask":
-            value[sn] = np.zeros(ncell) +1
+            value[sn] = np.zeros(ncell) + 1
             v[:] = value
         if varname == "area":
             lats = np.array(soil[2])

@@ -16,9 +16,11 @@ radiation over the North China Plain[J]. Qinghua Daxue Xuebao/journal of Tsinghu
 
 from math import pi
 from collections import OrderedDict
+from scipy import interpolate as intp
 import numpy as np
 import pandas as pd
 import datetime
+import functools
 import netCDF4 as nc
 
 ########################################################################################################################
@@ -102,13 +104,148 @@ def create_forcing(proj, coords, temp, prec, press, swdown, lwdown, vp, wind):
     forcing_date = creater_params["forcing_date"]
     forcing_file = creater_params["forcing_file"]
 
+    domain_file = proj.global_params["domain"][ "file_path"]
+    if domain_file is None:
+        raise ValueError("Domain file not set.")
+
+    df = nc.Dataset(domain_file, "r", "NETCDF4")
+    lon_size = df.dimensions['lon'].size
+    lat_size = df.dimensions['lat'].size
+    lons = np.array(df["lon"])
+    lats = np.array(df["lat"])
+    fv = df["mask"]._FillValue
+    mask = np.array(df["mask"])
+    mask[mask == fv], mask[mask != fv] = 0, 1
+    df.close()
+
+    # Choose interpolation method.
+    if proj.proj_params["creater_params"]["itp_method"] == "idw":
+        idp = proj.proj_params["creater_params"]["idw_params"]["idp"]
+        maxd = proj.proj_params["creater_params"]["idw_params"]["maxd"]
+    itp = functools.partial(idw, idp=idp, maxd=maxd)
+
+    # Create forcing files for every year.
     dates = pd.date_range(forcing_date, periods = temp.shape[0])
+    time_step = "days"
     years = np.unique(dates.year)
     for year in years:
-        ff = nc.Dataset("%s/%s_forcing.%d.nc" % (forcing_file, proj_name, year), "w", "NETCDF4")
+        in_this_year = dates.year == year
+        sub_dates = dates[in_this_year]
+        time_len = len(sub_dates)
+        since = datetime.datetime.strftime(sub_dates[0],  "%Y-%m-%d")
+
+        nc_file_name = "%s/%s_forcing.%d.nc" % (forcing_file, proj_name, year)
+        ff = nc.Dataset(nc_file_name, "w", "NETCDF4")
+        print nc_file_name+" has been created to write."
+
+        ff.createDimension("lon", lon_size)
+        ff.createDimension("lat", lat_size)
+        ff.createDimension("time", time_len)
+
+        v = ff.createVariable("lon", "f8", ("lon"))
+        v[:] = lons
+        v.standard_name = "longtitude"
+        v.units = "degrees_east"
+        v.axis = "X"
+
+        v = ff.createVariable("lat", "f8", ("lat"))
+        v[:] = lats
+        v.standard_name = "latitude"
+        v.units = "degrees_north"
+        v.axis = "Y"
+
+        v = ff.createVariable("time", "i4", ("time"))
+        v[:] = range(time_len)
+        v.units = "%s since %s"% (time_step, since)
+        v.calendar = "proleptic_gregorian"
+
+        v = ff.createVariable("mask", "f8", ("lat", "lon"), fill_value=0.0)
+        v[:] = mask
+        v.long_name = "fraction of grid cell that is active domain mask."
+        v.comment = "0 value indicates cell is not active."
+
+        #############################################################
+        # Write in atmospheric data.
+        #############################################################
+        v = ff.createVariable("tas", "f8", ("time", "lat", "lon"), fill_value=-9999)
+        v.long_name = v.decsription = "AIR_TEMP"
+        v.units = "C"
+        itp(v, temp[in_this_year], coords, mask, lons, lats)
+
+        v = ff.createVariable("prcp", "f8", ("time", "lat", "lon"), fill_value=-9999)
+        v.long_name = v.decsription = "PREC"
+        v.units = "mm/step"
+        itp(v, prec[in_this_year], coords, mask, lons, lats)
+
+        v = ff.createVariable("pres", "f8", ("time", "lat", "lon"), fill_value=-9999)
+        v.long_name = v.decsription = "PRESSURE"
+        v.units = "kPa"
+        itp(v, press[in_this_year], coords, mask, lons, lats)
+
+        v = ff.createVariable("dswrf", "f8", ("time", "lat", "lon"), fill_value=-9999)
+        v.long_name = v.decsription = "SWDOWN"
+        v.units = "W/m2"
+        itp(v, swdown[in_this_year], coords, mask, lons, lats)
+
+        v = ff.createVariable("dlwrf", "f8", ("time", "lat", "lon"), fill_value=-9999)
+        v.long_name = v.decsription = "LWDOWN"
+        v.units = "W/m2"
+        itp(v, lwdown[in_this_year], coords, mask, lons, lats)
+
+        v = ff.createVariable("vp", "f8", ("time", "lat", "lon"), fill_value=-9999)
+        v.long_name = v.decsription = "VP"
+        v.units = "kPa"
+        itp(v, vp[in_this_year], coords, mask, lons, lats)
+
+        v = ff.createVariable("wind", "f8", ("time", "lat", "lon"), fill_value=-9999)
+        v.long_name = v.decsription = "WIND"
+        v.units = "m/s"
+        itp(v, wind[in_this_year], coords, mask, lons, lats)
 
         ff.close()
-    # Todo
+
+########################################################################################################################
+#
+# Inverse distance weight interpolation.
+#
+########################################################################################################################
+def idw(nc_variable, stn_data, stn_coords, mask, lons, lats, idp=2, maxd=np.inf):
+    # Find coordinates.
+    sn = []
+    cell_lons = []
+    cell_lats = []
+    s = -1
+    for r in range(mask.shape[0]):
+        for c in range(mask.shape[1]):
+            s += 1
+            if mask[r, c] == 0: continue
+            sn.append(s)
+            cell_lons.append(lons[c])
+            cell_lats.append(lats[r])
+    cell_coords = np.concatenate(([cell_lons], [cell_lats])).T
+
+    # Creat weight matrix.
+    W_o = np.ndarray((stn_coords.shape[0], len(sn)))
+    for c in range(W_o.shape[1]):
+        w = np.array([np.linalg.norm(cell_coords[c]-stn_coord) for stn_coord in stn_coords])
+        w[w > maxd] = np.inf
+        w = 1/np.power(w, idp)
+        W_o[:, c] = w
+    W_mask = ~np.isnan(stn_data) * 1
+    stn_data[np.isnan(stn_data)] = 0
+
+    # Interpolation.
+    itp_data_o = np.dot(stn_data, W_o)
+    itp_data_b = np.dot(W_mask, W_o)
+    itp_data = itp_data_o / itp_data_b
+
+    # Write in nCDF file.
+    value = np.zeros(mask.shape[0] * mask.shape[1]) -9999
+    for t in range(itp_data.shape[0]):
+        value[sn] = itp_data[t]
+        nc_variable[t, :] = value
+
+
 ########################################################################################################################
 #
 # Get the end date of atmospheric data.

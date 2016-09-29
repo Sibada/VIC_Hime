@@ -53,6 +53,9 @@ class VicProj(object):
         creater_params["use_sh"] = False
         creater_params["forcing_file"] = None
 
+        creater_params["itp_method"] = "idw"
+        creater_params["idw_params"] = OrderedDict({"idp": 2, "maxd": None})
+
         prj_prm["creater_params"] = creater_params
 
         ##################################################### Routing parameters
@@ -68,10 +71,10 @@ class VicProj(object):
 
         # Basic run parameters.
         glo_prm["model_steps_per_day"] = 1
-        glo_prm["snow_steps_per_day"] = 1
-        glo_prm["runoff_steps_per_day"] = 1
+        glo_prm["snow_steps_per_day"] = 4
+        glo_prm["runoff_steps_per_day"] = 4
         glo_prm["start_time"] = datetime.datetime(1949, 1, 1)
-        glo_prm["end_time"] = datetime.datetime(1949, 1, 10)
+        glo_prm["end_time"] = datetime.datetime(1980, 12, 31)
         glo_prm["calendar"] = "PROLEPTIC_GREGORIAN"
 
         glo_prm["full_energy"] = "FALSE"
@@ -81,8 +84,8 @@ class VicProj(object):
         glo_prm["veglib_vegcover"] = "FALSE"
         # Domain file.
         domain = OrderedDict({
-            "file_path":"domain file path",
-            "domain_type":{
+            "file_path": None,
+            "domain_type": {
                 "LAT": "lat",
                 "LON": "lon",
                 "MASK": "mask",
@@ -96,7 +99,7 @@ class VicProj(object):
 
         # Forcing files.
         forcing1 = OrderedDict()
-        forcing1["file_path"] = "forcing file1 path"
+        forcing1["file_path"] = None
         forcing1["force_type"] = OrderedDict({
             "AIR_TEMP": "tas",
             "PREC": "prcp",
@@ -111,7 +114,7 @@ class VicProj(object):
         glo_prm["forcing2"] = None
 
         # Parameters file.
-        glo_prm["param_file"] = "parameters file path"
+        glo_prm["param_file"] = None
         glo_prm["snow_band"] = "FALSE"
         glo_prm["july_tavg"] = "FALSE"
         glo_prm["organic"] = "FALSE"
@@ -120,7 +123,7 @@ class VicProj(object):
         glo_prm["nodes"] = 3
 
         # Output files.
-        glo_prm["out_path"] = "output file path"
+        glo_prm["out_path"] = None
         out_file1 = OrderedDict({
             "out_file": "runoff",
             "out_format": "NETCDF4",
@@ -218,6 +221,7 @@ class VicProj(object):
         out_lines.append("# Output Files and Parameters")
         out_lines.append("#######################################################################")
 
+        out_lines.append("RESULT_DIR %s"% glo_prm["out_path"])
         for out_file in glo_prm["out_file"]:
             out_lines.append("OUTFILE %s" % out_file["out_file"])
             out_lines.append("OUT_FORMAT %s" % out_file["out_format"])
@@ -232,6 +236,7 @@ class VicProj(object):
         of = open(out_global_file, "w")
         of.writelines(out_lines)
         of.close()
+        print "File %s have been write."% out_global_file
 
     ####################################################################################################################
     '''
@@ -285,6 +290,28 @@ class VicProj(object):
 
     ####################################################################################################################
     #
+    # Create and delete forcing2 files.
+    #
+    ####################################################################################################################
+    def create_forcing2(self):
+        forcing2 = OrderedDict()
+        forcing2["file_path"] = None
+        forcing2["force_type"] = OrderedDict({
+            "AIR_TEMP": "tas",
+            "PREC": "prcp",
+            "PRESSURE": "pres",
+            "SWDOWN": "dwsrf",
+            "LWDOWN": "dlwrf",
+            "VP": "vp",
+            "WIND": "wind"
+        })
+        forcing2["wind_h"] = None
+        self.global_params["forcing2"] = forcing2
+
+    def delete_forcing2(self):
+        self.global_params["forcing2"] = None
+    ####################################################################################################################
+    #
     # Getter & Setters.
     #
     ####################################################################################################################
@@ -305,3 +332,50 @@ class VicProj(object):
 
     def set_out_domain_file(self, domain_file):
         self.proj_params["creater_params"]["domain_file"] = domain_file
+
+    def get_out_domain_file(self):
+        return self.proj_params["creater_params"]["domain_file"]
+
+    def set_out_forcing_file(self, domain_file):
+        self.proj_params["creater_params"]["forcing_file"] = domain_file
+
+    def get_parameters_file(self):
+        return self.global_params["param_file"]
+
+    def set_parameters_file(self, file_path):
+        self.global_params["param_file"] = file_path
+
+    def set_domain_file(self, file_path):
+        self.global_params["domain"]["file_path"] = file_path
+
+    def get_domain_file(self):
+        return self.global_params["domain"]["file_path"]
+
+    def set_result_path(self, result_path):
+        self.global_params["out_path"] = result_path
+
+    def set_use_sh(self, on):
+        self.proj_params["creater_params"]["use_sh"] = on
+
+    def set_atmospheric_file(self, temp, prec, press, vp, wind, swdown=None, lwdown=None, sh=None):
+        self.proj_params["creater_params"]["temp_file"] = temp
+        self.proj_params["creater_params"]["prec_file"] = prec
+        self.proj_params["creater_params"]["press_file"] = press
+        self.proj_params["creater_params"]["swdown_file"] = swdown
+        self.proj_params["creater_params"]["lwdown_file"] = lwdown
+        self.proj_params["creater_params"]["vp_file"] = vp
+        self.proj_params["creater_params"]["wind_file"] = wind
+        self.proj_params["creater_params"]["sh_file"] = sh
+
+    def set_station_coords_file(self, stn_coords):
+        self.proj_params["creater_params"]["stn_coords_file"] = stn_coords
+
+    def set_itp_method(self, method):
+        self.proj_params["creater_params"]["itp_method"] = method
+
+    def set_idw_params(self, idp=None, maxd=None):
+        if idp is not None: self.proj_params["creater_params"]["idw_params"]["idp"] = idp
+        if maxd is not None: self.proj_params["creater_params"]["idw_params"]["maxd"] = maxd
+
+    def set_forcing1_path(self, forcing_path):
+        self.global_params["forcing1"]["file_path"] = forcing_path
