@@ -174,7 +174,9 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
     params["root_zone"][:] = range(root_zone)
     params["month"][:] = range(12)
 
+    # ----------------------------------------------------------------------
     # Write soil parameters part of parameters file.
+    # ----------------------------------------------------------------------
     soil_part = range(35)
     del soil_part[32:34]
     if compute_treeline == "FALSE":
@@ -207,8 +209,9 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
             value[sn] = np.array(soil[col])
             v[:] = value
             col += 1
-
+    # ----------------------------------------------------------------------
     # Write vegetation parameters part of parameters file.
+    # ----------------------------------------------------------------------
     veg_part = range(35,39)
     for i in veg_part:
         variable = variables[i]
@@ -230,14 +233,18 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
             v[:] = value
 
         if varname == "Cv":
-            for cla in range(veg_class):
+            other_type_Cv = np.ones(ncell)
+            for cla in range(veg_class-1):
                 cv = np.zeros(ncell)
                 for cell in veg.keys():
                     for veg_info in veg[cell]:
                         if veg_info["veg_class"] == cla:
                             cv[cell-1] = veg_info["Cv"]
+                            other_type_Cv[cell-1] -= veg_info["Cv"]
                 value[sn] = cv
                 v[cla, :] = value
+            value[sn] = other_type_Cv
+            v[11, :] = value
 
         if varname == "root_depth":
             for cla in range(veg_class):
@@ -261,11 +268,14 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
                     value[sn] = rf
                     v[cla, rz, :] = value
 
+    # ----------------------------------------------------------------------
     # Write vegetation library part of parameters file.
+    # ----------------------------------------------------------------------
     veg_lib_part = range(39,52)
     if veglib_vegcover == "FALSE":
         veg_lib_part.remove(43)
-    col = 0
+
+    col = 1  # Column 0 is vegetation class
     for i in veg_lib_part:
         variable = variables[i]
         n_value = variable["n_value"]
@@ -297,8 +307,9 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
                     v[cla, month, :] = value
                 col += 1
 
-    v = params.createVariable("mask", "i4", ("lat", "lon"))
-    value = np.zeros(nx * ny) -9999
+    # Create mask.
+    v = params.createVariable("mask", "i4", ("lat", "lon"), fill_value=0)
+    value = np.zeros(nx * ny)
     value[sn] = np.zeros(ncell) + 1
     v[:] = value
 

@@ -104,7 +104,7 @@ class VicProj(object):
             "AIR_TEMP": "tas",
             "PREC": "prcp",
             "PRESSURE": "pres",
-            "SWDOWN": "dwsrf",
+            "SWDOWN": "dswrf",
             "LWDOWN": "dlwrf",
             "VP": "vp",
             "WIND": "wind"

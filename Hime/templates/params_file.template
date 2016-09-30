@@ -378,7 +378,7 @@
             "units": "m", 
             "format": "double", 
             "description": "Vegetation displacement height (typically 0.67 * vegetation height)", 
-            "n_value": "veg_class"
+            "n_value": "veg_class*12"
         }, 
         {
             "variable": "wind_h", 
