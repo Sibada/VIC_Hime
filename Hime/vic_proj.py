@@ -39,7 +39,7 @@ class VicProj(object):
         creater_params["decimal"] = 4
 
         # Forcings.
-        creater_params["forcing_date"] = datetime.datetime(1949, 1, 1)
+        creater_params["forcing_date"] = datetime.datetime(1959, 1, 1)
         creater_params["temp_file"] = None
         creater_params["prec_file"] = None
         creater_params["press_file"] = None
@@ -73,7 +73,7 @@ class VicProj(object):
         glo_prm["model_steps_per_day"] = 1
         glo_prm["snow_steps_per_day"] = 4
         glo_prm["runoff_steps_per_day"] = 4
-        glo_prm["start_time"] = datetime.datetime(1949, 1, 1)
+        glo_prm["start_time"] = datetime.datetime(1960, 1, 1)
         glo_prm["end_time"] = datetime.datetime(1980, 12, 31)
         glo_prm["calendar"] = "PROLEPTIC_GREGORIAN"
 
@@ -315,18 +315,26 @@ class VicProj(object):
     # Getter & Setters.
     #
     ####################################################################################################################
-    def get_rout_param(self):
+
+    # Get parameter structure of Routing.
+    def get_rout_params(self):
         return self.proj_params["rout_params"]
 
-    def set_soil_file(self,soil_file):
+    ###########################################################################
+    # Set classic VIC input parameter files to create netCDF parameters file.
+    ###########################################################################
+    def set_soil_file(self, soil_file):
         self.proj_params["creater_params"]["soil_file"] = soil_file
 
-    def set_veg_file(self,veg_file):
+    def set_veg_file(self, veg_file):
         self.proj_params["creater_params"]["veg_file"] = veg_file
 
     def set_veg_lib_file(self, veg_lib_file):
         self.proj_params["creater_params"]["veg_lib_file"] = veg_lib_file
 
+    ###########################################################################
+    # Set and get input and output path of netCDF parameters file.
+    ###########################################################################
     def set_out_params_file(self, params_file):
         self.proj_params["creater_params"]["params_file"] = params_file
 
@@ -336,9 +344,13 @@ class VicProj(object):
     def get_out_domain_file(self):
         return self.proj_params["creater_params"]["domain_file"]
 
+    # Set and get out path of netCDF forcing file.
     def set_out_forcing_file(self, domain_file):
         self.proj_params["creater_params"]["forcing_file"] = domain_file
 
+    ###########################################################################
+    # Set input file paths of global parameters.
+    ###########################################################################
     def get_parameters_file(self):
         return self.global_params["param_file"]
 
@@ -351,12 +363,19 @@ class VicProj(object):
     def get_domain_file(self):
         return self.global_params["domain"]["file_path"]
 
+    def set_forcing1_path(self, forcing_path):
+        self.global_params["forcing1"]["file_path"] = forcing_path
+
     def set_result_path(self, result_path):
         self.global_params["out_path"] = result_path
 
+    ###########################################################################
+    # Set if use sunshine hours data when creating forcing files.
+    ###########################################################################
     def set_use_sh(self, on):
         self.proj_params["creater_params"]["use_sh"] = on
 
+    # Set input files of atmospheric data to create netCDF forcing file.
     def set_atmospheric_file(self, temp, prec, press, vp, wind, swdown=None, lwdown=None, sh=None):
         self.proj_params["creater_params"]["temp_file"] = temp
         self.proj_params["creater_params"]["prec_file"] = prec
@@ -377,5 +396,6 @@ class VicProj(object):
         if idp is not None: self.proj_params["creater_params"]["idw_params"]["idp"] = idp
         if maxd is not None: self.proj_params["creater_params"]["idw_params"]["maxd"] = maxd
 
-    def set_forcing1_path(self, forcing_path):
-        self.global_params["forcing1"]["file_path"] = forcing_path
+    def set_forcing_date(self, year, month, day):
+        self.proj_params["creater_params"]["forcing_date"] = \
+            datetime.datetime(year, month, day)

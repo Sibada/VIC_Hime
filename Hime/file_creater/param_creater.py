@@ -64,7 +64,7 @@ def read_soil_file(proj, soil_path=None):
 #
 ########################################################################################################################
 def read_veg_file(proj, veg_path=None):
-    creater_params=proj.proj_params["creater_params"]
+    creater_params = proj.proj_params["creater_params"]
     n_rz = creater_params["n_rootzones"]
     if veg_path is None:
         veg_path = creater_params["veg_file"]
@@ -74,27 +74,27 @@ def read_veg_file(proj, veg_path=None):
     vf.close()
 
     l = 0
-    veg=OrderedDict()
+    veg = OrderedDict()
     while l < len(vf_lines):
         line = vf_lines[l]
-        line_split = re.split("[\s\r\t\n]",line.strip())
+        line_split = re.split("[\s\r\t\n]", line.strip())
         cell = int(line_split[0])
         nvegc = int(line_split[1])
         l += 1
 
-        vegcs=[]
+        vegcs = []
         for t in range(nvegc):
             line = vf_lines[l]
-            sub_line_split = re.split("[\s\r\t\n]",line.strip())
-            veg_info = OrderedDict({"veg_class":int(sub_line_split[0])})
-            veg_info.update({"Cv":float(sub_line_split[1])})
+            sub_line_split = re.split("[\s\r\t\n]", line.strip())
             sub_line_split = np.array(sub_line_split)
-            veg_info.update({"root_depth":[float(r) for r in sub_line_split[range(2, n_rz*2+2, 2)]]})
-            veg_info.update({"root_fract":[float(r) for r in sub_line_split[range(3, n_rz*2+3, 2)]]})
+            veg_info = OrderedDict({"veg_class": int(sub_line_split[0])})
+            veg_info.update({"Cv": float(sub_line_split[1])})
+            veg_info.update({"root_depth": [float(r) for r in sub_line_split[range(2, n_rz*2+2, 2)]]})
+            veg_info.update({"root_fract": [float(r) for r in sub_line_split[range(3, n_rz*2+3, 2)]]})
 
             vegcs.append(veg_info)
             l += 1
-        veg.update({cell:vegcs})
+        veg.update({cell: vegcs})
 
     return veg
 
@@ -106,8 +106,9 @@ def read_veg_file(proj, veg_path=None):
 def read_veg_lib(proj, veg_lib_path=None):
     if veg_lib_path is None:
         veg_lib_path = proj.proj_params["creater_params"]["veg_lib_file"]
+
     veg_lib = pd.read_table(veg_lib_path, sep="[,\s]", comment="#", header=None)
-    veg_lib.rename(columns={"#Class":"Class"}, inplace=True)
+    veg_lib.rename(columns={"#Class": "Class"}, inplace=True)
     proj.proj_params["creater_params"]["veg_class"] = veg_lib.shape[0]
 
     return veg_lib

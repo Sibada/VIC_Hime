@@ -16,10 +16,9 @@ radiation over the North China Plain[J]. Qinghua Daxue Xuebao/journal of Tsinghu
 
 from math import pi
 from collections import OrderedDict
-from scipy import interpolate as intp
 import numpy as np
 import pandas as pd
-import datetime
+import datetime as dt
 import functools
 import netCDF4 as nc
 
@@ -30,116 +29,189 @@ import netCDF4 as nc
 # If incoming long and short wave radiations could not be provided, can choose to
 # estimate them by provide sunshine durations.
 ########################################################################################################################
-def read_stn_data(proj):
-    creater_params=proj.proj_params["creater_params"]
 
-    forcing_date = creater_params["forcing_date"]
-    temp_file = creater_params["temp_file"]
-    prec_file = creater_params["prec_file"]
-    press_file = creater_params["press_file"]
-    swdown_file = creater_params["swdown_file"]
-    lwdown_file = creater_params["lwdown_file"]
-    vp_file = creater_params["vp_file"]
-    wind_file = creater_params["wind_file"]
-    sh_file = creater_params["sh_file"]
-    stn_coords_file = creater_params["stn_coords_file"]
+# forcing_params is a dict or OrderedDict include those:
+#
+# {
+#   "variables": [{"path": "path", "var_name": "var_name", "description": "desc"}, ...],
+#   "coords_path": "coords_path",
+#   "start_time": [year, month, day],
+#   "use_sh": ["sh_path", "temp_path", "vp_path", "sw_var_name", "lw_var_name"]
+# }
+def read_stn_data(forcing_params):
 
-    use_sh = creater_params["use_sh"]
+    variables = forcing_params["variables"]
+    coords_path = forcing_params["coords_path"]
+    st_ymd = forcing_params["start_time"]
+    start_time = dt.datetime(st_ymd[0], st_ymd[1], st_ymd[2])
+    use_sh = forcing_params["use_sh"]
 
-    if stn_coords_file is None:
-        raise ValueError("Stations coordinates file should be provided.")
+    # Read coordinates of stations.
+    coords = np.array(pd.read_table(coords_path, sep=r"[\s,;]", header=None))
+    stn_num = coords.shape[0]
 
-    if temp_file is None or prec_file is None or press_file is None or vp_file is None or wind_file is None:
-        raise ValueError("Atmospheric data type is not enough.")
+    # ###################################################################################
+    #
+    # Read atmospheric data.
+    #
+    # ###################################################################################
+    if len(variables) < 1:
+        raise ValueError("Must provide at lease one variable.")
 
-    temp = np.array(pd.read_table(temp_file, sep = r"[\s,;]", header = None))
-    prec = np.array(pd.read_table(prec_file, sep = r"[\s,;]", header = None))
-    press = np.array(pd.read_table(press_file, sep = r"[\s,;]", header = None))
-    vp = np.array(pd.read_table(vp_file, sep = r"[\s,;]", header = None))
-    wind = np.array(pd.read_table(wind_file, sep = r"[\s,;]", header = None))
+    var_data = []
+    for variable in variables:
+        data = np.array(pd.read_table(variable["path"], sep=r"[\s,;]", header=None))
+        new_var = OrderedDict({
+            "data": data,
+            "var_name": variable["var_name"],
+            "description": variable["description"]
+        })
+        var_data.append(new_var)
 
-    coords = np.array(pd.read_table(stn_coords_file, sep = r"[\s,;]", header = None))
+    data_length = var_data[0]["data"].shape[0]
 
-    if use_sh:
-        if sh_file is None:
-            raise ValueError("Sunshine hours data should be provided.")
+    # TODO: Check if the length and col nums are equal
 
-        a_s = 0.25; b_s = 0.50
-        sh = np.array(pd.read_table(sh_file, sep = r"[\s,;]", header = None))
-        dates = pd.date_range(forcing_date, periods = sh.shape[0])
+
+    ts = pd.date_range(start_time, periods=data_length)
+    end_time = ts[-1].to_datetime()
+
+    # ###################################################################################
+    #
+    # Estimate incoming short and long wave radiation by providing sunshine hours data.
+    #
+    # ###################################################################################
+    if use_sh is not None:
+        sh_path = use_sh[0]
+        temp_path = use_sh[1]
+        vp_path = use_sh[2]
+
+        sw_var_name = use_sh[3]
+        lw_var_name = use_sh[4]
+
+        # TODO: Check if those before is empty string.
+        sh = np.array(pd.read_table(sh_path, sep=r"[\s,;]", header=None))
+        temp = np.array(pd.read_table(temp_path, sep=r"[\s,;]", header=None))
+        vp = np.array(pd.read_table(vp_path, sep=r"[\s,;]", header=None))
 
         swdown = np.ndarray(sh.shape)
         lwdown = np.ndarray(sh.shape)
-        J = np.array([float(date.strftime("%j")) for date in dates])
+
+        a_s, b_s = 0.25, 0.50
+
+        J = np.array([float(date.strftime("%j")) for date in ts])
         delta = 0.408 * np.sin(2*pi*J/365-1.39)
         dr = 1 + 0.033*np.cos(2*pi/365*J)
+
         for i in range(sh.shape[1]):
-            lat = coords[i,1]*pi/180
+            lat = coords[i, 1] * pi / 180
             omegas = np.arccos(-np.tan(delta) * lat)
-            Ra = 1366.66/pi*dr*(omegas*np.sin(lat)*np.sin(delta)+np.cos(lat)*np.cos(delta)*np.sin(omegas))
-            N = omegas*24/pi
-            Rs = (a_s + b_s*sh[:,i]/N)*Ra
+            Ra = 1366.66 / pi * dr * (omegas * np.sin(lat) * np.sin(delta) +
+                                      np.cos(lat) * np.cos(delta) * np.sin(omegas))
+            N = omegas * 24 / pi
+            Rs = (a_s + b_s * sh[:, i] / N) * Ra
 
             # Estimate incoming long wave radiation using Konzelmann equation.
 
-            eps_ac = 0.23 + 0.848 * np.power(vp[:, i]*10/(temp[:, i]+273.15),1.0/7.0)
-            s = (a_s + b_s*sh[:, i]/N)/(a_s + b_s)
-            eps_a = 1-s+s*eps_ac
-            Rld = eps_a * 5.67e-8 * np.power((temp[:,1]+273.15),4)
+            eps_ac = 0.23 + 0.848 * np.power(vp[:, i] * 10 / (temp[:, i] + 273.15), 1.0 / 7.0)
+            s = (a_s + b_s * sh[:, i] / N) / (a_s + b_s)
+            eps_a = 1 - s + s * eps_ac
+            Rld = eps_a * 5.67e-8 * np.power((temp[:, 1] + 273.15), 4)
 
             swdown[:, i] = Rs
             lwdown[:, i] = Rld
 
-    else:
-        if swdown_file is None or lwdown_file is None:
-            raise ValueError("Both incoming short wave and long wave radiation data should be provided.")
-        lwdown = np.array(pd.read_table(lwdown_file, sep = r"[\s,;]", header = None))
-        swdown = np.array(pd.read_table(swdown_file, sep = r"[\s,;]", header = None))
+        swdown_var = OrderedDict({
+            "data": swdown,
+            "var_name": sw_var_name,
+            "description": "SWDOWN"
+        })
+        lwdown_var = OrderedDict({
+            "data": lwdown,
+            "var_name": lw_var_name,
+            "description": "LWDOWN"
+        })
+        var_data.append(swdown_var)
+        var_data.append(lwdown_var)
 
-    return coords, temp, prec, press, swdown, lwdown, vp, wind
+    forcing_data = OrderedDict()
+    forcing_data["coords"] = coords
+    forcing_data["variables"] = var_data
+    forcing_data["start_time"] = start_time
+    forcing_data["end_time"] = end_time
 
-def create_forcing(proj, coords, temp, prec, press, swdown, lwdown, vp, wind):
-    proj_name = proj.proj_params["proj_name"]
-    creater_params=proj.proj_params["creater_params"]
-    forcing_date = creater_params["forcing_date"]
-    forcing_file = creater_params["forcing_file"]
+    return forcing_data
 
-    domain_file = proj.global_params["domain"][ "file_path"]
-    if domain_file is None:
-        raise ValueError("Domain file not set.")
+########################################################################################################################
+#
+# Create forcing files by interpolation.
+#
+########################################################################################################################
 
-    df = nc.Dataset(domain_file, "r", "NETCDF4")
-    lon_size = df.dimensions['lon'].size
-    lat_size = df.dimensions['lat'].size
-    lons = np.array(df["lon"])
-    lats = np.array(df["lat"])
-    fv = df["mask"]._FillValue
-    mask = np.array(df["mask"])
+# create_params is a dict or OrderedDict include those:
+#
+# {
+#   "forcing_path": "domain_file",
+#   "domain_file": "domain_file",
+#   "idw_params": [idp, maxd, maxp],
+#   "krige_params": ["vgm_model"]
+# }
+def create_forcing(forcing_data, create_params):
+
+    coords = forcing_data["coords"]
+    start_time = forcing_data["start_time"]
+    data_length = forcing_data["variables"][0]["data"].shape[0]
+    ts = pd.date_range(start_time, periods=data_length)
+
+    forcing_path = create_params["forcing_path"]
+    domain_file = create_params["domain_file"]
+
+    # ######################################################### Read mask grid.
+    domain = nc.Dataset(domain_file, "r", "NETCDF4")
+    nlon = domain.dimensions['lon'].size
+    nlat = domain.dimensions['lat'].size
+    lons = np.array(domain["lon"])
+    lats = np.array(domain["lat"])
+    fv = domain["mask"]._FillValue
+    mask = np.array(domain["mask"])
     mask[mask == fv], mask[mask != fv] = 0, 1
-    df.close()
+    domain.close()
 
-    # Choose interpolation method.
-    if proj.proj_params["creater_params"]["itp_method"] == "idw":
-        idp = proj.proj_params["creater_params"]["idw_params"]["idp"]
-        maxd = proj.proj_params["creater_params"]["idw_params"]["maxd"]
-    itp = functools.partial(idw, idp=idp, maxd=maxd)
+    # Get coordinates of grids to be interpolated.
+    sn, grid_lons, grid_lats = [], [], []; s = -1
+    for r in range(mask.shape[0]):
+        for c in range(mask.shape[1]):
+            s += 1
+            if mask[r, c] == 0: continue
+            sn.append(s)
+            grid_lons.append(lons[c])
+            grid_lats.append(lats[r])
+    grid_coords = np.concatenate(([grid_lons], [grid_lats])).T
 
-    # Create forcing files for every year.
-    dates = pd.date_range(forcing_date, periods = temp.shape[0])
+    # ############################################ Choose interpolation method.
+    if create_params["idw_params"] is not None:
+        idp = create_params["idw_params"][0]
+        maxd = create_params["idw_params"][1]
+        maxp = create_params["idw_params"][2]
+        itp = functools.partial(idw, idp=idp, maxd=maxd)
+
+    # #################################### Create forcing files for every year.
     time_step = "days"
-    years = np.unique(dates.year)
+    years = np.unique(ts.year)
     for year in years:
-        in_this_year = dates.year == year
-        sub_dates = dates[in_this_year]
-        time_len = len(sub_dates)
-        since = datetime.datetime.strftime(sub_dates[0],  "%Y-%m-%d")
+        in_this_year = ts.year == year
+        sub_ts = ts[in_this_year]
+        time_len = len(sub_ts)
+        since = dt.datetime.strftime(sub_ts[0],  "%Y-%m-%d")
 
-        nc_file_name = "%s/%s_forcing.%d.nc" % (forcing_file, proj_name, year)
+        nc_file_name = "%s%d.nc" % (forcing_path, year)
+
+        # Create and open netCDF file.
         ff = nc.Dataset(nc_file_name, "w", "NETCDF4")
-        print nc_file_name+" has been created to write."
+        print nc_file_name + " has been created to write."
 
-        ff.createDimension("lon", lon_size)
-        ff.createDimension("lat", lat_size)
+        ff.createDimension("lon", nlon)
+        ff.createDimension("lat", nlat)
         ff.createDimension("time", time_len)
 
         v = ff.createVariable("lon", "f8", ("lon"))
@@ -164,43 +236,20 @@ def create_forcing(proj, coords, temp, prec, press, swdown, lwdown, vp, wind):
         v.long_name = "fraction of grid cell that is active domain mask."
         v.comment = "0 value indicates cell is not active."
 
-        #############################################################
+        #######################################################################
         # Write in atmospheric data.
-        #############################################################
-        v = ff.createVariable("tas", "f8", ("time", "lat", "lon"), fill_value=-9999)
-        v.long_name = v.decsription = "AIR_TEMP"
-        v.units = "C"
-        itp(v, temp[in_this_year], coords, mask, lons, lats)
+        #######################################################################
+        for variable in forcing_data["variables"]:
+            var_name = variable["var_name"]
+            data = variable["data"]
+            v = ff.createVariable(var_name, "f8", ("time", "lat", "lon"), fill_value=-9999)
+            v.long_name = variable["description"]
 
-        v = ff.createVariable("prcp", "f8", ("time", "lat", "lon"), fill_value=-9999)
-        v.long_name = v.decsription = "PREC"
-        v.units = "mm/step"
-        itp(v, prec[in_this_year], coords, mask, lons, lats)
-
-        v = ff.createVariable("pres", "f8", ("time", "lat", "lon"), fill_value=-9999)
-        v.long_name = v.decsription = "PRESSURE"
-        v.units = "kPa"
-        itp(v, press[in_this_year], coords, mask, lons, lats)
-
-        v = ff.createVariable("dswrf", "f8", ("time", "lat", "lon"), fill_value=-9999)
-        v.long_name = v.decsription = "SWDOWN"
-        v.units = "W/m2"
-        itp(v, swdown[in_this_year], coords, mask, lons, lats)
-
-        v = ff.createVariable("dlwrf", "f8", ("time", "lat", "lon"), fill_value=-9999)
-        v.long_name = v.decsription = "LWDOWN"
-        v.units = "W/m2"
-        itp(v, lwdown[in_this_year], coords, mask, lons, lats)
-
-        v = ff.createVariable("vp", "f8", ("time", "lat", "lon"), fill_value=-9999)
-        v.long_name = v.decsription = "VP"
-        v.units = "kPa"
-        itp(v, vp[in_this_year], coords, mask, lons, lats)
-
-        v = ff.createVariable("wind", "f8", ("time", "lat", "lon"), fill_value=-9999)
-        v.long_name = v.decsription = "WIND"
-        v.units = "m/s"
-        itp(v, wind[in_this_year], coords, mask, lons, lats)
+            # Interpolation
+            itp_data = itp(data[in_this_year], coords, grid_coords)
+            values = np.zeros((time_len, mask.shape[0] * mask.shape[1])) -9999.0
+            values[:, sn] = itp_data
+            v[:] = values
 
         ff.close()
 
@@ -209,25 +258,14 @@ def create_forcing(proj, coords, temp, prec, press, swdown, lwdown, vp, wind):
 # Inverse distance weight interpolation.
 #
 ########################################################################################################################
-def idw(nc_variable, stn_data, stn_coords, mask, lons, lats, idp=2, maxd=np.inf):
-    # Find coordinates.
-    sn = []
-    cell_lons = []
-    cell_lats = []
-    s = -1
-    for r in range(mask.shape[0]):
-        for c in range(mask.shape[1]):
-            s += 1
-            if mask[r, c] == 0: continue
-            sn.append(s)
-            cell_lons.append(lons[c])
-            cell_lats.append(lats[r])
-    cell_coords = np.concatenate(([cell_lons], [cell_lats])).T
+def idw(stn_data, stn_coords, grid_coords, idp=2, maxd=np.inf):
+
+    n_grids = grid_coords.shape[0]
 
     # Creat weight matrix.
-    W_o = np.ndarray((stn_coords.shape[0], len(sn)))
+    W_o = np.ndarray((stn_coords.shape[0], n_grids))
     for c in range(W_o.shape[1]):
-        w = np.array([np.linalg.norm(cell_coords[c]-stn_coord) for stn_coord in stn_coords])
+        w = np.array([np.linalg.norm(grid_coords[c]-stn_coord) for stn_coord in stn_coords])
         w[w > maxd] = np.inf
         w = 1/np.power(w, idp)
         W_o[:, c] = w
@@ -239,18 +277,4 @@ def idw(nc_variable, stn_data, stn_coords, mask, lons, lats, idp=2, maxd=np.inf)
     itp_data_b = np.dot(W_mask, W_o)
     itp_data = itp_data_o / itp_data_b
 
-    # Write in nCDF file.
-    value = np.zeros(mask.shape[0] * mask.shape[1]) -9999
-    for t in range(itp_data.shape[0]):
-        value[sn] = itp_data[t]
-        nc_variable[t, :] = value
-
-
-########################################################################################################################
-#
-# Get the end date of atmospheric data.
-#
-########################################################################################################################
-def get_end_date(proj, length, freq="D"):
-    forcing_date = proj.proj_params["creater_params"]["forcing_date"]
-    return pd.date_range(forcing_date, periods=length-1, freq=freq)[-1]
+    return itp_data
