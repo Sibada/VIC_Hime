@@ -14,6 +14,7 @@ Yang H, Huafang L V, Qingfang H U, et al. Comparison of parametrization methods 
 radiation over the North China Plain[J]. Qinghua Daxue Xuebao/journal of Tsinghua University, 2014, 54(5):590-595.
 """
 
+from Hime.version import version as __version__
 from math import pi
 from collections import OrderedDict
 import numpy as np
@@ -47,6 +48,7 @@ def read_stn_data(forcing_params):
     use_sh = forcing_params["use_sh"]
 
     # Read coordinates of stations.
+    print "Reading station coordinates file %s" % coords_path
     coords = np.array(pd.read_table(coords_path, sep=r"[\s,;]", header=None))
     stn_num = coords.shape[0]
 
@@ -60,6 +62,7 @@ def read_stn_data(forcing_params):
 
     var_data = []
     for variable in variables:
+        print "Reading %s" % variable["path"]
         data = np.array(pd.read_table(variable["path"], sep=r"[\s,;]", header=None))
         new_var = OrderedDict({
             "data": data,
@@ -71,7 +74,6 @@ def read_stn_data(forcing_params):
     data_length = var_data[0]["data"].shape[0]
 
     # TODO: Check if the length and col nums are equal
-
 
     ts = pd.date_range(start_time, periods=data_length)
     end_time = ts[-1].to_datetime()
@@ -157,7 +159,6 @@ def read_stn_data(forcing_params):
 #   "krige_params": ["vgm_model"]
 # }
 def create_forcing(forcing_data, create_params):
-
     coords = forcing_data["coords"]
     start_time = forcing_data["start_time"]
     data_length = forcing_data["variables"][0]["data"].shape[0]
@@ -182,7 +183,8 @@ def create_forcing(forcing_data, create_params):
     for r in range(mask.shape[0]):
         for c in range(mask.shape[1]):
             s += 1
-            if mask[r, c] == 0: continue
+            if mask[r, c] == 0:
+                continue
             sn.append(s)
             grid_lons.append(lons[c])
             grid_lats.append(lats[r])
@@ -206,27 +208,30 @@ def create_forcing(forcing_data, create_params):
 
         nc_file_name = "%s%d.nc" % (forcing_path, year)
 
-        # Create and open netCDF file.
+        # ######################################## Create and open netCDF file.
         ff = nc.Dataset(nc_file_name, "w", "NETCDF4")
+        ff.description = "VIC parameter file created by VIC Hime " + __version__ + " at " +\
+                         dt.datetime.now().strftime('%Y-%m-%d, %H:%M:%S')
+
         print nc_file_name + " has been created to write."
 
         ff.createDimension("lon", nlon)
         ff.createDimension("lat", nlat)
         ff.createDimension("time", time_len)
 
-        v = ff.createVariable("lon", "f8", ("lon"))
+        v = ff.createVariable("lon", "f8", ("lon",))
         v[:] = lons
-        v.standard_name = "longtitude"
+        v.standard_name = "longitude"
         v.units = "degrees_east"
         v.axis = "X"
 
-        v = ff.createVariable("lat", "f8", ("lat"))
+        v = ff.createVariable("lat", "f8", ("lat",))
         v[:] = lats
         v.standard_name = "latitude"
         v.units = "degrees_north"
         v.axis = "Y"
 
-        v = ff.createVariable("time", "i4", ("time"))
+        v = ff.createVariable("time", "i4", ("time",))
         v[:] = range(time_len)
         v.units = "%s since %s"% (time_step, since)
         v.calendar = "proleptic_gregorian"
@@ -247,7 +252,7 @@ def create_forcing(forcing_data, create_params):
 
             # Interpolation
             itp_data = itp(data[in_this_year], coords, grid_coords)
-            values = np.zeros((time_len, mask.shape[0] * mask.shape[1])) -9999.0
+            values = np.zeros((time_len, mask.shape[0] * mask.shape[1])) - 9999.0
             values[:, sn] = itp_data
             v[:] = values
 

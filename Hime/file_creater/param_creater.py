@@ -314,7 +314,7 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
     value[sn] = np.zeros(ncell) + 1
     v[:] = value
 
-    params.description = "VIC parameter file created by VIC Hime " + __version__ + " at " +  datetime.datetime.now().\
+    params.description = "VIC parameter file created by VIC Hime " + __version__ + " at " + datetime.datetime.now().\
         strftime('%Y-%m-%d, %H:%M:%S')
     params.close()
 
