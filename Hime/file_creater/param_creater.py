@@ -6,7 +6,8 @@ VIC parameters file creater
 """
 
 from Hime.version import version as __version__
-from Hime.vic_proj import VicProj
+from Hime.utils import read_template
+from Hime.ascii_grid import Grid
 from Hime import templates_path
 from collections import OrderedDict
 from math import pi, sin, cos
@@ -16,22 +17,6 @@ import pandas as pd
 import re, json
 import os, sys
 import datetime
-
-########################################################################################################################
-#
-# Read output information template file.
-#
-########################################################################################################################
-def read_template(template_file):
-    tf = open(template_file)
-    tem_lines = tf.readlines()
-    tf.close()
-    try:
-        tem_str = "".join(tem_lines)
-        tem = json.loads(tem_str, object_pairs_hook=OrderedDict)
-    except Exception:
-        raise ValueError("Format of parameter template file uncorrect.")
-    return tem
 
 ########################################################################################################################
 #
@@ -213,7 +198,7 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
     # ----------------------------------------------------------------------
     # Write vegetation parameters part of parameters file.
     # ----------------------------------------------------------------------
-    veg_part = range(35,39)
+    veg_part = range(35, 39)
     for i in veg_part:
         variable = variables[i]
         varname = variable["variable"]
@@ -321,6 +306,7 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
     #######################################################################
     # Write domain file.
     #######################################################################
+
     print "Write domain file"
     domain = nc.Dataset(out_domain_path, "w", "NETCDF4")
 
@@ -328,6 +314,7 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
     domain.createDimension("lat", ny)
 
     domain_vars = params_tem["domain"]
+    fract_file = creater_params["fract_file"]
 
     value = np.zeros(nx * ny)
     for domain_var in domain_vars:
@@ -349,8 +336,14 @@ def create_params_file(proj, out_params_path=None, out_domain_path=None):
             v[:] = lats_value
             v.axis = "Y"
         if varname == "frac":
-            value[sn] = np.zeros(ncell) +1.0
-            v[:] = value
+            if fract_file is not None:
+                fract = Grid(fract_file)
+                if not fract.ncol == nx and fract.nrow == ny:
+                    raise ValueError("Size of fraction file grid is not suit.")
+                v[:] = fract.value
+            else:
+                value[sn] = np.zeros(ncell) +1.0
+                v[:] = value
         if varname == "mask":
             value[sn] = np.zeros(ncell) + 1
             v[:] = value

@@ -1,0 +1,9 @@
+{
+    "TEMP": ["C", "AIR_TEMP"],
+    "PREC": ["mm/step", "PREC"],
+    "PRESS": ["kPa", "PRESSURE"],
+    "SWDOWN": ["W/m2", "SWDOWN"],
+    "LWDOWN": ["W/m2", "LWDOWN"],
+    "VP": ["kPa", "VP"],
+    "WIND": ["m/s", "WIND"]
+}

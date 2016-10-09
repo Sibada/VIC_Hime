@@ -6,6 +6,11 @@ from collections import OrderedDict
 import datetime
 import json
 
+########################################################################################################################
+#
+# A class to storage parameters of a VIC project.
+#
+########################################################################################################################
 class VicProj(object):
     def __init__(self, proj_name, proj_path):
         self.global_params = OrderedDict()
@@ -35,6 +40,8 @@ class VicProj(object):
         creater_params["veg_lib_file"] = None
         creater_params["params_file"] = None
         creater_params["domain_file"] = None
+
+        creater_params["fract_file"] = None
 
         creater_params["decimal"] = 4
 
@@ -71,10 +78,10 @@ class VicProj(object):
 
         # Basic run parameters.
         glo_prm["model_steps_per_day"] = 1
-        glo_prm["snow_steps_per_day"] = 4
-        glo_prm["runoff_steps_per_day"] = 4
+        glo_prm["snow_steps_per_day"] = 1
+        glo_prm["runoff_steps_per_day"] = 1
         glo_prm["start_time"] = datetime.datetime(1960, 1, 1)
-        glo_prm["end_time"] = datetime.datetime(1980, 12, 31)
+        glo_prm["end_time"] = datetime.datetime(1970, 12, 31)
         glo_prm["calendar"] = "PROLEPTIC_GREGORIAN"
 
         glo_prm["full_energy"] = "FALSE"

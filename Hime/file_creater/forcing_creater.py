@@ -15,6 +15,9 @@ radiation over the North China Plain[J]. Qinghua Daxue Xuebao/journal of Tsinghu
 """
 
 from Hime.version import version as __version__
+from Hime import templates_path
+from Hime.utils import read_template
+
 from math import pi
 from collections import OrderedDict
 import numpy as np
@@ -34,17 +37,20 @@ import netCDF4 as nc
 # forcing_params is a dict or OrderedDict include those:
 #
 # {
-#   "variables": [{"path": "path", "var_name": "var_name", "description": "desc"}, ...],
+#   "variables": [{"path": "path", "var_name": "var_name", "type": "desc"}, ...],
 #   "coords_path": "coords_path",
 #   "start_time": [year, month, day],
 #   "use_sh": ["sh_path", "temp_path", "vp_path", "sw_var_name", "lw_var_name"]
 # }
+# type must be one of those: TEMP, PREC, PRESS, SWDOWN, LWDOWN, VP, WIND
 def read_stn_data(forcing_params):
-
     variables = forcing_params["variables"]
     coords_path = forcing_params["coords_path"]
     st_ymd = forcing_params["start_time"]
     start_time = dt.datetime(st_ymd[0], st_ymd[1], st_ymd[2])
+    ed_ymd = forcing_params["end_time"]
+    end_time = dt.datetime(ed_ymd[0], ed_ymd[1], ed_ymd[2])
+    freq = forcing_params["freq"]
     use_sh = forcing_params["use_sh"]
 
     # Read coordinates of stations.
@@ -67,7 +73,7 @@ def read_stn_data(forcing_params):
         new_var = OrderedDict({
             "data": data,
             "var_name": variable["var_name"],
-            "description": variable["description"]
+            "type": variable["type"]
         })
         var_data.append(new_var)
 
@@ -76,7 +82,6 @@ def read_stn_data(forcing_params):
     # TODO: Check if the length and col nums are equal
 
     ts = pd.date_range(start_time, periods=data_length)
-    end_time = ts[-1].to_datetime()
 
     # ###################################################################################
     #
@@ -126,12 +131,12 @@ def read_stn_data(forcing_params):
         swdown_var = OrderedDict({
             "data": swdown,
             "var_name": sw_var_name,
-            "description": "SWDOWN"
+            "type": "SWDOWN"
         })
         lwdown_var = OrderedDict({
             "data": lwdown,
             "var_name": lw_var_name,
-            "description": "LWDOWN"
+            "type": "LWDOWN"
         })
         var_data.append(swdown_var)
         var_data.append(lwdown_var)
@@ -141,6 +146,7 @@ def read_stn_data(forcing_params):
     forcing_data["variables"] = var_data
     forcing_data["start_time"] = start_time
     forcing_data["end_time"] = end_time
+    forcing_data["freq"] = freq
 
     return forcing_data
 
@@ -161,8 +167,11 @@ def read_stn_data(forcing_params):
 def create_forcing(forcing_data, create_params):
     coords = forcing_data["coords"]
     start_time = forcing_data["start_time"]
+    end_time = forcing_data["end_time"]
+    freq = forcing_data["freq"]
     data_length = forcing_data["variables"][0]["data"].shape[0]
-    ts = pd.date_range(start_time, periods=data_length)
+
+    ts = pd.date_range(start_time, end=end_time, freq=freq)
 
     forcing_path = create_params["forcing_path"]
     domain_file = create_params["domain_file"]
@@ -204,7 +213,7 @@ def create_forcing(forcing_data, create_params):
         in_this_year = ts.year == year
         sub_ts = ts[in_this_year]
         time_len = len(sub_ts)
-        since = dt.datetime.strftime(sub_ts[0],  "%Y-%m-%d")
+        since = dt.datetime.strftime(sub_ts[0], "%Y-%m-%d")
 
         nc_file_name = "%s%d.nc" % (forcing_path, year)
 
@@ -233,7 +242,7 @@ def create_forcing(forcing_data, create_params):
 
         v = ff.createVariable("time", "i4", ("time",))
         v[:] = range(time_len)
-        v.units = "%s since %s"% (time_step, since)
+        v.units = "%s since %s" % (time_step, since)
         v.calendar = "proleptic_gregorian"
 
         v = ff.createVariable("mask", "f8", ("lat", "lon"), fill_value=0.0)
@@ -241,14 +250,19 @@ def create_forcing(forcing_data, create_params):
         v.long_name = "fraction of grid cell that is active domain mask."
         v.comment = "0 value indicates cell is not active."
 
+        forc_tem = read_template(templates_path + "/forc_file.template")
         #######################################################################
         # Write in atmospheric data.
         #######################################################################
         for variable in forcing_data["variables"]:
             var_name = variable["var_name"]
             data = variable["data"]
+            var_type = variable["type"]
             v = ff.createVariable(var_name, "f8", ("time", "lat", "lon"), fill_value=-9999)
-            v.long_name = variable["description"]
+
+            if forc_tem.get(var_type) is not None:
+                v.units = forc_tem.get(var_type)[0]
+                v.long_name = forc_tem.get(var_type)[1]
 
             # Interpolation
             itp_data = itp(data[in_this_year], coords, grid_coords)
@@ -257,6 +271,7 @@ def create_forcing(forcing_data, create_params):
             v[:] = values
 
         ff.close()
+
 
 ########################################################################################################################
 #
