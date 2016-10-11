@@ -27,7 +27,7 @@ class Grid(object):
             self.csize = float(re.split("\s+", disc_lines[4])[1])
             ndvalue = float(re.split("\s+", disc_lines[5])[1])
 
-            self.value = np.loadtxt(file_path, skiprows=6)
+            self.value = np.loadtxt(file_path, skiprows=6)[::-1, ]
             self.value[self.value == ndvalue] = np.nan
 
             self.shape = self.value.shape

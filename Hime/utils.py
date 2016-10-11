@@ -4,13 +4,12 @@
 from collections import OrderedDict
 import json
 
+
 ########################################################################################################################
 #
 # Read output information template file.
 #
 ########################################################################################################################
-
-
 def read_template(template_file):
     tf = open(template_file)
     tem_lines = tf.readlines()
@@ -21,4 +20,18 @@ def read_template(template_file):
     except Exception:
         raise ValueError("Format of parameter template file uncorrect.")
     return tem
+
+
+########################################################################################################################
+#
+# Row and column to series number.
+#
+########################################################################################################################
+def xy_to_sn(x, y, nx=None, ny=None):
+    if nx is None or ny is None:
+        nx, ny = x.max() + 1, y.max() + 1
+
+    sn = (y - 1) * nx + x - 1
+    return sn
+
 
