@@ -26,7 +26,7 @@ def read_direc(direc_path):
 # Create site of the next cell.
 #
 ########################################################################################################################
-def next_cell(direc, arc_dir_code=True):
+def next_cell(direc, arc_dir_code=False):
     # Direction code.
     if arc_dir_code:
         dx = {64: 0,
@@ -45,6 +45,7 @@ def next_cell(direc, arc_dir_code=True):
               8: -1,
               16: 0,
               32: 1}
+        print "Use ArcInfo direction code."
     else:
         dx = {1: 0,
               2: 1,
@@ -62,6 +63,7 @@ def next_cell(direc, arc_dir_code=True):
               6: -1,
               7: 0,
               8: 1}
+        print "Use default direction code."
 
     next_x = direc.value.copy()
     next_y = direc.value.copy()
@@ -109,7 +111,7 @@ def discovery_basin(station, next_x, next_y):
 
                 # Detect circle.
                 if [ix, iy] in prev_xy:
-                    print "Warning: circle detected at grid cell (%d, %d). This cell will set to 0."
+                    print "Warning: circle detected at grid cell (%d, %d). This cell will set to 0." % (ix, iy)
                     next_x[iy, ix] = 0
                     next_y[iy, ix] = 0
                     break
@@ -127,9 +129,11 @@ def discovery_basin(station, next_x, next_y):
                 prev_xy.insert(0, [ix, iy])
 
                 # Go to next grid cell.
-                ix = next_x[y, x]
-                iy = next_y[y, x]
+                ix = next_x[iy, ix]
+                iy = next_y[iy, ix]
 
+    basin = np.array(basin)
+    print "%d cells in this basin." % len(basin)
     return basin
 
 
@@ -143,11 +147,10 @@ def get_uh_m(basin, direc, veloc, diffu, next_x, next_y):
     R = 6371393.0
     dt = 3600.0
     le = 48
-    ke = 12
 
     t = np.arange(0.0, dt * (le+1), dt)
 
-    uh_m = np.zeros((le, nrow, ncol))
+    uh_m = np.zeros((le+1, nrow, ncol))
 
     for cell in basin:
         x, y = cell[0], cell[1]
@@ -164,7 +167,9 @@ def get_uh_m(basin, direc, veloc, diffu, next_x, next_y):
         dis = R * acos(sin(lat)*sin(nlat)+cos(lat)*cos(nlat)*cos(lng-nlng))
 
         # Green's equation
-        h = dis / (2*t*np.sqrt(pi*D*t)) * np.exp(-np.power(v*t-dis, 2)/(4*D*t))
+        e = -1 * np.power(v * t - dis, 2) / (4 * D * t)
+        h = dis / (2 * t * np.sqrt(pi * t * D)) * np.exp(e)
+        h[0] = 0.0
         uh_m[:, y, x] = h / h.sum()
 
     return uh_m
@@ -178,8 +183,8 @@ def create_uh_cell(basin, station, uh_m, next_x, next_y, uh_slope):
     days = 96
     t_max = days * 24
 
-    uh_cell = np.zeros(ncell, days + len(uh_slope) - 1)
-    i = 1
+    uh_cell = np.zeros((ncell, days + len(uh_slope) - 1))
+    i = 0
     for cell in basin:
         x, y = cell[0], cell[1]
 
@@ -189,8 +194,7 @@ def create_uh_cell(basin, station, uh_m, next_x, next_y, uh_slope):
         while(True):
             if x == stn_x and y == stn_y:
                 break
-            uh_hour[:] = np.convolve(uh_hour, uh_m[:, y, x], "same")
-
+            uh_hour[:] = np.convolve(uh_hour, uh_m[:, y, x])[:t_max]
             x, y = next_x[y, x], next_y[y, x]
 
         uh_hour = uh_hour / uh_hour.sum()
@@ -198,10 +202,13 @@ def create_uh_cell(basin, station, uh_m, next_x, next_y, uh_slope):
         uh_day = np.zeros(days)
         for d in range(days):
             uh_day[d] = uh_hour[d*24:(d+1)*24].sum()
+        uh_day = uh_day / uh_day.sum()
 
-        uh_cell[i, :] = np.convolve(uh_day, uh_slope)
+        uh_cell[i, :] = np.convolve(uh_slope, uh_day)
         uh_cell[i, :] = uh_cell[i, :] / uh_cell[i, :].sum()
         i += 1
+
+        print "Cell %d dealed." % i
 
     return uh_cell
 
@@ -226,13 +233,13 @@ def create_rout(rout_info):
     station = rout_info["station"]
 
     if type(rout_info["veloc"]) is float:
-        veloc = Grid(value=rout_info["veloc"], shape=direc.shape)
+        veloc = Grid(value=rout_info["veloc"], shape=direc.shape).value
     else:
-        veloc = Grid(rout_info["veloc"])
+        veloc = Grid(rout_info["veloc"]).value
     if type(rout_info["diffu"]) is float:
-        diffu = Grid(value=rout_info["diffu"], shape=direc.shape)
+        diffu = Grid(value=rout_info["diffu"], shape=direc.shape).value
     else:
-        diffu = Grid(rout_info["diffu"])
+        diffu = Grid(rout_info["diffu"]).value
 
     if rout_info["uh_slope"] == "from_template":
         uh_slope = np.loadtxt(templates_path + "/uh_slope.template")
@@ -246,7 +253,8 @@ def create_rout(rout_info):
 
     rout_data = OrderedDict()
     rout_data["basin"] = basin
-    rout_data["sn"] = xy_to_sn(basin[:, 0], basin[:, 1])
+    sn = xy_to_sn(basin[:, 0], basin[:, 1])
+    rout_data["sn"] = sn
     rout_data["uh_cell"] = uh_cell
 
     return rout_data

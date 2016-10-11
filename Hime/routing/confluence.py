@@ -8,18 +8,17 @@ from Hime.routing.uh_creater import create_rout
 from math import acos, sin, cos, pi
 from collections import OrderedDict
 import numpy as np
-import json
+import demjson
 
 
 ########################################################################################################################
 #
 # Load and save rout data.
 #
-#
 ########################################################################################################################
 def load_rout_data(file_path):
     df = open(file_path, "r")
-    rout_data = json.loads(df.readlines(), object_pairs_hook=OrderedDict)
+    rout_data = demjson.decode(df.readlines(), object_pairs_hook=OrderedDict)
     df.close()
 
     rout_data["basin"] = np.array(rout_data["basin"])
@@ -28,7 +27,7 @@ def load_rout_data(file_path):
 
 
 def write_rout_data(rout_data, file_path):
-    rout_json = json.dumps(rout_data, indent=4)
+    rout_json = demjson.encode(rout_data)
     df = open(file_path, "w")
     df.writelines(rout_json)
     df.close()
