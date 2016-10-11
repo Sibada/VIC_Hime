@@ -3,11 +3,10 @@
 
 from Hime.ascii_grid import Grid
 from Hime import templates_path
-from Hime.utils import xy_to_sn
-from Hime.routing.uh_creater import create_rout
-from math import acos, sin, cos, pi
 from collections import OrderedDict
 import numpy as np
+import pandas as pd
+import netCDF4 as nc
 import demjson
 
 
@@ -52,3 +51,45 @@ def convolution(uh_cell, runoff_yield):
     daily_runoff = pre.sum(axis=1)
     return daily_runoff
 
+
+########################################################################################################################
+#
+# Provide a VIC output nCDF file with runoff variables, domain file and date range to output runoff data of the basin.
+#
+########################################################################################################################
+def confluence(vic_out_file, rout_data, domain_file, start_date, end_date):
+    sn = rout_data["sn"]
+    uh_cell = rout_data["uh_cell"]
+
+    vf = nc.Dataset(vic_out_file, "r")
+    # TODO: Detect if it have variable names time, OUT_BASEFLOW and OUT_RUNOFF.
+
+    time_units = vf.variables["time"].units
+    calendar = vf.variables["time"].calendar
+    ts = pd.date_range(start_date, end_date)
+    t = nc.date2index(ts, time_units, calendar)
+
+    baseflow = vf.variables["OUT_BASEFLOW"][t, sn]
+    runoff = vf.variables["OUT_RUNOFF"][t, sn]
+    vf.close()
+
+    df = nc.Dataset(domain_file, "r")
+    # TODO: Detect if it have variable names area.
+    area = df.variables["area"][sn]
+
+    runoff_yield = (runoff + baseflow) * area / 2073600000.0
+
+    daily_runoff = convolution(uh_cell, runoff_yield)
+    return daily_runoff
+
+
+########################################################################################################################
+#
+# Transfer runoff series from daily series to monthly series.
+#
+########################################################################################################################
+def gather_to_month(daily_runoff, start_date, end_date):
+    ts = pd.date_range(start_date, end_date)
+    d_runoff = pd.Series(daily_runoff, index=ts)
+    monthly_runoff = d_runoff.resample("M", how="mean")
+    return monthly_runoff

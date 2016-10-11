@@ -71,9 +71,9 @@ def next_cell(direc, arc_dir_code=False):
     # Find x y site of next cell.
     for x in range(direc.ncol):
         for y in range(direc.nrow):
-            if direc.value[y ,x] == 0:
+            if direc.value[y, x] == 0:
                 continue
-            direc_v = direc.value[y, x]
+            direc_v = int(direc.value[y, x])
             next_x[y, x] = x + dx[direc_v]
             next_y[y, x] = y + dy[direc_v]
 
@@ -98,6 +98,9 @@ def discovery_basin(station, next_x, next_y):
     nrow = next_x.shape[0]
     ncol = next_x.shape[1]
 
+    in_basin = np.zeros_like(next_x)
+    in_basin[stn_y, stn_x] = 1
+
     basin = []
 
     for y in range(nrow):
@@ -108,7 +111,6 @@ def discovery_basin(station, next_x, next_y):
             prev_xy = [[-1, -1], [-1, -1], [-1, -1], [-1, -1], [-1, -1]]  # A list used for detect circle.
             ix, iy = x, y
             while True:
-
                 # Detect circle.
                 if [ix, iy] in prev_xy:
                     print "Warning: circle detected at grid cell (%d, %d). This cell will set to 0." % (ix, iy)
@@ -118,8 +120,9 @@ def discovery_basin(station, next_x, next_y):
 
                 if ix >= ncol or ix < 0 or iy >= nrow or iy < 0:
                     break
-                if ix == stn_x and iy == stn_y:
+                if in_basin[iy, ix] > 0:
                     basin.append([x, y])
+                    in_basin[iy, ix] = 1
                     break
                 if next_x[iy, ix] <= 0:
                     break
@@ -129,8 +132,7 @@ def discovery_basin(station, next_x, next_y):
                 prev_xy.insert(0, [ix, iy])
 
                 # Go to next grid cell.
-                ix = next_x[iy, ix]
-                iy = next_y[iy, ix]
+                ix, iy = next_x[iy, ix], next_y[iy, ix]
 
     basin = np.array(basin)
     print "%d cells in this basin." % len(basin)
@@ -208,7 +210,9 @@ def create_uh_cell(basin, station, uh_m, next_x, next_y, uh_slope):
         uh_cell[i, :] = uh_cell[i, :] / uh_cell[i, :].sum()
         i += 1
 
-        print "Cell %d dealed." % i
+        # Log when complete 10 percent.
+        if i % (len(basin)/10) == 0:
+            print "Cell %d dealed." % i
 
     return uh_cell
 
