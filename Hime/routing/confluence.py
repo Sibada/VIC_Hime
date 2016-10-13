@@ -7,7 +7,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import netCDF4 as nc
-import demjson
+import demjson, json
 
 
 ########################################################################################################################
@@ -17,7 +17,8 @@ import demjson
 ########################################################################################################################
 def load_rout_data(file_path):
     df = open(file_path, "r")
-    rout_data = demjson.decode(df.readlines(), object_pairs_hook=OrderedDict)
+    json_lines = "".join(df.readlines())
+    rout_data = json.loads(json_lines)
     df.close()
 
     rout_data["basin"] = np.array(rout_data["basin"])

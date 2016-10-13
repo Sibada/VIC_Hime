@@ -29,48 +29,38 @@ class VicProj(object):
         prj_prm["vic_image_driver"] = None
         prj_prm["n_cores"] = 4
 
-        #################################################### Creater parameters
-        creater_params = OrderedDict()
-        creater_params["n_layers"] = 3
-        creater_params["n_rootzones"] = 3
-        creater_params["snow_band"] = 5
-        creater_params["veg_class"] = 12
-        creater_params["soil_file"] = None
-        creater_params["veg_file"] = None
-        creater_params["veg_lib_file"] = None
-        creater_params["params_file"] = None
-        creater_params["domain_file"] = None
+        #######################################################################
+        # VIC self-calibration parameters.
+        #######################################################################
+        calib_param = OrderedDict()
 
-        creater_params["fract_file"] = None
+        calib_param["rout_data_file"] = None
+        calib_param["time_scale"] = "M"
 
-        creater_params["decimal"] = 4
+        calib_param["global_file"] = None
+        calib_param["domain_file"] = None
+        calib_param["out_file"] = None
 
-        # Forcings.
-        creater_params["forcing_date"] = datetime.datetime(1959, 1, 1)
-        creater_params["temp_file"] = None
-        creater_params["prec_file"] = None
-        creater_params["press_file"] = None
-        creater_params["swdown_file"] = None
-        creater_params["lwdown_file"] = None
-        creater_params["vp_file"] = None
-        creater_params["wind_file"] = None
-        creater_params["sh_file"] = None
-        creater_params["stn_coords_file"] = None
+        calib_param["obs_data_file"] = None
+        calib_param["obs_start_date"] = None
 
-        creater_params["use_sh"] = False
-        creater_params["forcing_file"] = None
+        calib_param["start_date"] = None
+        calib_param["rout_date"] = None
+        calib_param["end_date"] = None
 
-        creater_params["itp_method"] = "idw"
-        creater_params["idw_params"] = OrderedDict({"idp": 2, "maxd": None})
+        calib_param["BPC"] = 0.25
+        calib_param["only_bias"] = False
 
-        prj_prm["creater_params"] = creater_params
+        calib_param["mpi"] = False
 
-        ##################################################### Routing parameters
-        rout_params = OrderedDict()
-        rout_params["uh_file"] = None
-        rout_params["sim_file"] = None
-        rout_params["obs_file"] = None
-        prj_prm["rout_params"] = rout_params
+        calib_param["pset"] = [[0.1, 0.25, 0.5],
+                               [0.01, 0.1, 0.3],
+                               [10.0, 40.0, 80.0],
+                               [0.75, 0.8, 0.85],
+                               [0.1, 0.3, 0.5],
+                               [0.1, 0.4, 0.7]]
+
+        self.proj_params["calib_param"] = calib_param
 
         #######################################################################
         # VIC global parameters.
@@ -185,8 +175,8 @@ class VicProj(object):
         out_lines.append("#######################################################################")
         domain = glo_prm["domain"]
         out_lines.append("DOMAIN %s" % domain["file_path"])
-        for type in domain["domain_type"].items():
-            out_lines.append("DOMAIN_TYPE %s %s" % (type[0], type[1]))
+        for tp in domain["domain_type"].items():
+            out_lines.append("DOMAIN_TYPE %s %s" % (tp[0], tp[1]))
         out_lines.append("")
 
         out_lines.append("#######################################################################")
@@ -204,9 +194,9 @@ class VicProj(object):
 
         if glo_prm["forcing2"] is not None:
             forcing2 = glo_prm["forcing2"]
-            out_lines.append("FORCING2 %s" % forcing1["file_path"])
-            for type in forcing2["force_type"].items():
-                out_lines.append("FORCE_TYPE %s %s" % (type[0], type[1]))
+            out_lines.append("FORCING2 %s" % forcing2["file_path"])
+            for tp in forcing2["force_type"].items():
+                out_lines.append("FORCE_TYPE %s %s" % (tp[0], tp[1]))
             if forcing2["wind_h"] is not None:
                 out_lines.append("WIND_H %.2f" % forcing1["wind_h"])
             out_lines.append("")
@@ -271,6 +261,7 @@ class VicProj(object):
         pf.write(proj_json)
         pf.close()
 
+
     ####################################################################################################################
     '''
     Read in project parameters file.
@@ -318,52 +309,21 @@ class VicProj(object):
 
     def delete_forcing2(self):
         self.global_params["forcing2"] = None
+
     ####################################################################################################################
     #
     # Getter & Setters.
     #
     ####################################################################################################################
 
-    # Get parameter structure of Routing.
-    def get_rout_params(self):
-        return self.proj_params["rout_params"]
-
-    ###########################################################################
-    # Set classic VIC input parameter files to create netCDF parameters file.
-    ###########################################################################
-    def set_soil_file(self, soil_file):
-        self.proj_params["creater_params"]["soil_file"] = soil_file
-
-    def set_veg_file(self, veg_file):
-        self.proj_params["creater_params"]["veg_file"] = veg_file
-
-    def set_veg_lib_file(self, veg_lib_file):
-        self.proj_params["creater_params"]["veg_lib_file"] = veg_lib_file
-
-    ###########################################################################
-    # Set and get input and output path of netCDF parameters file.
-    ###########################################################################
-    def set_out_params_file(self, params_file):
-        self.proj_params["creater_params"]["params_file"] = params_file
-
-    def set_out_domain_file(self, domain_file):
-        self.proj_params["creater_params"]["domain_file"] = domain_file
-
-    def get_out_domain_file(self):
-        return self.proj_params["creater_params"]["domain_file"]
-
-    # Set and get out path of netCDF forcing file.
-    def set_out_forcing_file(self, domain_file):
-        self.proj_params["creater_params"]["forcing_file"] = domain_file
-
     ###########################################################################
     # Set input file paths of global parameters.
     ###########################################################################
-    def get_parameters_file(self):
-        return self.global_params["param_file"]
-
     def set_parameters_file(self, file_path):
         self.global_params["param_file"] = file_path
+
+    def get_parameters_file(self):
+        return self.global_params["param_file"]
 
     def set_domain_file(self, file_path):
         self.global_params["domain"]["file_path"] = file_path
@@ -371,39 +331,55 @@ class VicProj(object):
     def get_domain_file(self):
         return self.global_params["domain"]["file_path"]
 
-    def set_forcing1_path(self, forcing_path):
-        self.global_params["forcing1"]["file_path"] = forcing_path
-
     def set_result_path(self, result_path):
         self.global_params["out_path"] = result_path
 
+    def set_start_time(self, y, m, d):
+        self.global_params["start_time"] = datetime.datetime(y, m, d)
+
+    def set_end_time(self, y, m, d):
+        self.global_params["end_time"] = datetime.datetime(y, m, d)
+
     ###########################################################################
-    # Set if use sunshine hours data when creating forcing files.
+    # forcing must be a dict like that:
+    #     forcing = {
+    #         "file_path": ".../filepath.",
+    #         "force_type": {
+    #             "AIR_TEMP": "tas",
+    #             "PREC": "prcp",
+    #             "PRESSURE": "pres",
+    #             "SWDOWN": "dswrf",
+    #             "LWDOWN": "dlwrf",
+    #             "VP": "vp",
+    #             "WIND": "wind"
+    #         },
+    #         "wind_h": None
+    #     }
     ###########################################################################
-    def set_use_sh(self, on):
-        self.proj_params["creater_params"]["use_sh"] = on
+    def set_forcing1(self, forcing):
+        self.global_params["forcing1"] = forcing
 
-    # Set input files of atmospheric data to create netCDF forcing file.
-    def set_atmospheric_file(self, temp, prec, press, vp, wind, swdown=None, lwdown=None, sh=None):
-        self.proj_params["creater_params"]["temp_file"] = temp
-        self.proj_params["creater_params"]["prec_file"] = prec
-        self.proj_params["creater_params"]["press_file"] = press
-        self.proj_params["creater_params"]["swdown_file"] = swdown
-        self.proj_params["creater_params"]["lwdown_file"] = lwdown
-        self.proj_params["creater_params"]["vp_file"] = vp
-        self.proj_params["creater_params"]["wind_file"] = wind
-        self.proj_params["creater_params"]["sh_file"] = sh
+    def set_forcing2(self, forcing):
+        self.global_params["forcing2"] = forcing
 
-    def set_station_coords_file(self, stn_coords):
-        self.proj_params["creater_params"]["stn_coords_file"] = stn_coords
+    ###########################################################################
+    # Set and get driver path.
+    ###########################################################################
 
-    def set_itp_method(self, method):
-        self.proj_params["creater_params"]["itp_method"] = method
+    def set_image_driver(self, driver_path):
+        self.proj_params["vic_image_driver"] = driver_path
 
-    def set_idw_params(self, idp=None, maxd=None):
-        if idp is not None: self.proj_params["creater_params"]["idw_params"]["idp"] = idp
-        if maxd is not None: self.proj_params["creater_params"]["idw_params"]["maxd"] = maxd
+    def get_image_driver(self):
+        return self.proj_params["vic_image_driver"]
 
-    def set_forcing_date(self, year, month, day):
-        self.proj_params["creater_params"]["forcing_date"] = \
-            datetime.datetime(year, month, day)
+    def set_proj_path(self, driver_path):
+        self.proj_params["proj_path"] = driver_path
+
+    def get_proj_path(self):
+        return self.proj_params["proj_path"]
+
+    def set_ncores(self, ncores):
+        self.proj_params["n_cores"] = ncores
+
+    def get_ncores(self):
+        return self.proj_params["n_cores"]
