@@ -38,6 +38,7 @@ class VicProj(object):
         calib_param["time_scale"] = "M"
 
         calib_param["global_file"] = None
+        calib_param["params_file"] = None
         calib_param["domain_file"] = None
         calib_param["out_file"] = None
 
@@ -53,7 +54,7 @@ class VicProj(object):
 
         calib_param["mpi"] = False
 
-        calib_param["pset"] = [[0.1, 0.25, 0.5],
+        calib_param["p_init"] = [[0.1, 0.25, 0.5],
                                [0.01, 0.1, 0.3],
                                [10.0, 40.0, 80.0],
                                [0.75, 0.8, 0.85],
