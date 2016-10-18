@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from Hime.statistic import nmse, bias
-from Hime.model_execer.vic_execer import vic_exec_mpi, vic_exec
+from Hime.model_execer.vic_execer import vic_exec
 from Hime.routing.confluence import load_rout_data, confluence, gather_to_month
 from Hime.utils import set_value_nc, set_soil_depth
 from . import log
@@ -36,12 +36,11 @@ def try_run_vic(proj, rout_data):
 
     driver = proj.get_image_driver()
 
-    # Execute VIC
-    if mpi:
-        ncores = proj.get_ncores()
-        vic_exec_mpi(driver, global_file, n_proc=ncores)
-    else:
-        vic_exec(driver, global_file)
+    # Run VIC
+    ncores = proj.get_ncores()
+    sta_code = vic_exec(driver, global_file, log_path=None, mpi=mpi, n_proc=ncores)
+    if sta_code != 0:
+        raise ValueError("VIC run fail. Return %d" % sta_code)
 
     # Confluence.
     sim = confluence(out_file, rout_data, domain_file, rout_date, end_date)
@@ -65,6 +64,7 @@ def try_run_vic(proj, rout_data):
     else:
         e = np.abs(BIAS) * BPC + NMSE
 
+    log.info("VIC runs result  E: %.3f   NMSE: %.3f BIAS: %.3f" % (e, NMSE, BIAS))
     return e, NMSE, BIAS
 
 
@@ -114,7 +114,7 @@ def calibrate(proj):
     lob = [0, 0, 0, 0, -1, -1]
     rob = [1, 1, -1, 1, -1, -1]
     lcb = [-1, -1, -1, -1, 0.1, 0.1]
-    rcb = [-1, -1, -1, -1, -1, -1]
+    rcb = [-1, -1, -1, -1, 10, 10]
 
     opt_site = [1, 1, 1, 1, 1, 1]
 
@@ -127,13 +127,16 @@ def calibrate(proj):
     set_soil_depth(params_file, 3, p_init[5, 1], col_row=calib_mask)
 
     turns = 2
-    max_itr = 10
-    toler = 0.01
+    max_itr = 20
+    toler = 0.005
 
     step_val = None
 
+    log.info("Calibrating start.")
     for turn in range(turns):
+        log.info("Turns %d" % (turn+1))
         for calib_param in calib_params:
+            log.info("Calibrate %s" % calib_param)
             pid = calib_params.index(calib_param)
 
             left_x = p_init[pid, 0]
@@ -143,7 +146,7 @@ def calibrate(proj):
             if step_val is not None and opt_site[pid] == 0:
                 left_y = step_val
             else:
-                left_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, median_x)
+                left_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
 
             if step_val is not None and opt_site[pid] == 1:
                 median_y = step_val
@@ -153,13 +156,15 @@ def calibrate(proj):
             if step_val is not None and opt_site[pid] == 2:
                 right_y = step_val
             else:
-                right_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, median_x)
+                right_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
 
             sorted_y = sorted([left_y, median_y, right_y])
             dy = sorted_y[1] - sorted_y[0]
 
             itr = 0
             while dy > toler and itr < max_itr:
+                log.debug("Calibrate %s, (x,y)1 = (%.3f, %.3f), (x,y)2 = (%.3f, %.3f), (x,y)3 = (%.3f, %.3f)" \
+                          % (calib_param, left_x, left_y, median_x, median_y, right_x, right_y))
                 if median_y < left_y and median_y < right_y:
                     left_x = (left_x + median_x) / 2
                     right_x = (right_x + median_x) / 2
@@ -176,9 +181,9 @@ def calibrate(proj):
                         break
 
                     elif lcb[pid] != -1 and left_x < lcb[pid]:
-                        right_x = median_x
-                        median_x = left_x
                         left_x = lcb[pid]
+                        right_x = median_x
+                        median_x = left_x_o
 
                         right_y = median_y
                         median_y = left_y
@@ -186,6 +191,14 @@ def calibrate(proj):
 
                     elif lob[pid] != -1 and left_x <= lob[pid]:
                         left_x = (lob[pid] + left_x_o) / 2
+                        right_x = median_x
+                        median_x = left_x_o
+
+                        right_y = median_y
+                        median_y = left_y
+                        left_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
+
+                    else:
                         right_x = median_x
                         median_x = left_x_o
 
@@ -202,9 +215,9 @@ def calibrate(proj):
                         break
 
                     elif rcb[pid] != -1 and right_x > rcb[pid]:
-                        left_x = median_x
-                        median_x = right_x
                         right_x = rcb[pid]
+                        left_x = median_x
+                        median_x = right_x_o
 
                         left_y = median_y
                         median_y = right_y
@@ -212,6 +225,14 @@ def calibrate(proj):
 
                     elif rob[pid] != -1 and right_x >= rob[pid]:
                         right_x = (rob[pid] + right_x_o) / 2
+                        left_x = median_x
+                        median_x = right_x_o
+
+                        left_y = median_y
+                        median_y = right_y
+                        right_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
+
+                    else:
                         left_x = median_x
                         median_x = right_x_o
 
@@ -232,11 +253,17 @@ def calibrate(proj):
                     opt_site[pid] = 2
 
                 sorted_y = sorted([left_y, median_y, right_y])
+
                 dy = sorted_y[1] - sorted_y[0]
 
-                log.info("Calibrate %s: value = %.3f, Nsc = %.3f, Bias = %.3f, E = %.3f" %
-                         (calib_param, 1-NMSE, BIAS, step_val))
+                itr += 1
 
+            log.info("Calibrate %s: value = %.3f, Nsc = %.3f, Bias = %.3f, E = %.3f" %
+                     (calib_param, p_init[pid, opt_site[pid]], 1-NMSE, BIAS, step_val))
 
-
+        log.info("Calibrate result:  Infilt: %.3f, Ds: %.3f, Dsmax: %.3f, \
+                 Ws: %.3f, d2: %.3f, d3: %.3f, E: %.3f, NSC: %.3f, BIAS: %.3f"
+                 % (p_init[0, opt_site[0]], p_init[1, opt_site[1]], p_init[2, opt_site[2]],
+                    p_init[3, opt_site[3]], p_init[4, opt_site[4]], p_init[5, opt_site[5]],
+                    step_val, NMSE, BIAS))
 
