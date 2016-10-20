@@ -64,7 +64,7 @@ def try_run_vic(proj, rout_data):
     else:
         e = np.abs(BIAS) * BPC + NMSE
 
-    log.info("VIC runs result  E: %.3f   NMSE: %.3f BIAS: %.3f" % (e, NMSE, BIAS))
+    log.debug("VIC runs result  E: %.3f   NMSE: %.3f BIAS: %.3f" % (e, NMSE, BIAS))
     return e, NMSE, BIAS
 
 
@@ -128,9 +128,11 @@ def calibrate(proj):
 
     turns = 2
     max_itr = 20
-    toler = 0.005
+    toler = 0.001
 
-    step_val = None
+    step_E = None
+    step_NMSE = [0, 0, 0]
+    step_BIAS = [0, 0, 0]
 
     log.info("Calibrating start.")
     for turn in range(turns):
@@ -143,51 +145,52 @@ def calibrate(proj):
             median_x = p_init[pid, 1]
             right_x = p_init[pid, 2]
 
-            if step_val is not None and opt_site[pid] == 0:
-                left_y = step_val
+            if step_E is not None and opt_site[pid] == 0:
+                left_y = step_E
             else:
-                left_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
+                left_y, step_NMSE[0], step_BIAS[0] = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
 
-            if step_val is not None and opt_site[pid] == 1:
-                median_y = step_val
+            if step_E is not None and opt_site[pid] == 1:
+                median_y = step_E
             else:
-                median_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, median_x)
+                median_y, step_NMSE[1], step_BIAS[1] = run_adjust(proj, calib_mask, rout_data, calib_param, median_x)
 
-            if step_val is not None and opt_site[pid] == 2:
-                right_y = step_val
+            if step_E is not None and opt_site[pid] == 2:
+                right_y = step_E
             else:
-                right_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
+                right_y, step_NMSE[2], step_BIAS[2] = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
 
             sorted_y = sorted([left_y, median_y, right_y])
             dy = sorted_y[1] - sorted_y[0]
 
             itr = 0
             while dy > toler and itr < max_itr:
-                log.debug("Calibrate %s, (x,y)1 = (%.3f, %.3f), (x,y)2 = (%.3f, %.3f), (x,y)3 = (%.3f, %.3f)" \
+                log.debug("Calibrate %s, (x,y)1 = (%.3f, %.3f), (x,y)2 = (%.3f, %.3f), (x,y)3 = (%.3f, %.3f)"
                           % (calib_param, left_x, left_y, median_x, median_y, right_x, right_y))
                 if median_y < left_y and median_y < right_y:
                     left_x = (left_x + median_x) / 2
                     right_x = (right_x + median_x) / 2
 
-                    left_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
-                    right_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
+                    left_y, step_NMSE[0], step_BIAS[0] = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
+                    right_y, step_NMSE[2], step_BIAS[2] = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
 
                 elif left_y < median_y < right_y:
-                    left_x_o = left_x
-                    left_x -= (right_x - left_x) / 2
-                    if lcb[pid] != -1 and left_x_o == lcb[pid]:
-                        step_val = left_y
-                        opt_site[pid] = 0
+                    if lcb[pid] != -1 and left_x == lcb[pid]:
                         break
 
-                    elif lcb[pid] != -1 and left_x < lcb[pid]:
+                    left_x_o = left_x
+                    left_x -= (right_x - left_x) / 2
+
+                    if lcb[pid] != -1 and left_x < lcb[pid]:
                         left_x = lcb[pid]
                         right_x = median_x
                         median_x = left_x_o
 
                         right_y = median_y
                         median_y = left_y
-                        left_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
+                        step_NMSE[2] = step_NMSE[1]
+                        step_NMSE[1] = step_NMSE[0]
+                        left_y, step_NMSE[0], step_BIAS[0] = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
 
                     elif lob[pid] != -1 and left_x <= lob[pid]:
                         left_x = (lob[pid] + left_x_o) / 2
@@ -196,7 +199,9 @@ def calibrate(proj):
 
                         right_y = median_y
                         median_y = left_y
-                        left_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
+                        step_NMSE[2] = step_NMSE[1]
+                        step_NMSE[1] = step_NMSE[0]
+                        left_y, step_NMSE[0], step_BIAS[0] = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
 
                     else:
                         right_x = median_x
@@ -204,24 +209,27 @@ def calibrate(proj):
 
                         right_y = median_y
                         median_y = left_y
-                        left_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
+                        step_NMSE[2] = step_NMSE[1]
+                        step_NMSE[1] = step_NMSE[0]
+                        left_y, step_NMSE[0], step_BIAS[0] = run_adjust(proj, calib_mask, rout_data, calib_param, left_x)
 
                 elif left_y > median_y > right_y:
-                    right_x_o = right_x
-                    right_x += (right_x - left_x) / 2
-                    if rcb[pid] != -1 and right_x_o == rcb[pid]:
-                        step_val = right_y
-                        opt_site[pid] = 2
+                    if rcb[pid] != -1 and right_x == rcb[pid]:
                         break
 
-                    elif rcb[pid] != -1 and right_x > rcb[pid]:
+                    right_x_o = right_x
+                    right_x += (right_x - left_x) / 2
+
+                    if rcb[pid] != -1 and right_x > rcb[pid]:
                         right_x = rcb[pid]
                         left_x = median_x
                         median_x = right_x_o
 
                         left_y = median_y
                         median_y = right_y
-                        right_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
+                        step_NMSE[0] = step_NMSE[1]
+                        step_NMSE[1] = step_NMSE[2]
+                        right_y, step_NMSE[2], step_BIAS[2] = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
 
                     elif rob[pid] != -1 and right_x >= rob[pid]:
                         right_x = (rob[pid] + right_x_o) / 2
@@ -230,7 +238,9 @@ def calibrate(proj):
 
                         left_y = median_y
                         median_y = right_y
-                        right_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
+                        step_NMSE[0] = step_NMSE[1]
+                        step_NMSE[1] = step_NMSE[2]
+                        right_y, step_NMSE[2], step_BIAS[2] = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
 
                     else:
                         left_x = median_x
@@ -238,32 +248,37 @@ def calibrate(proj):
 
                         left_y = median_y
                         median_y = right_y
-                        right_y, NMSE, BIAS = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
+                        step_NMSE[0] = step_NMSE[1]
+                        step_NMSE[1] = step_NMSE[2]
+                        right_y, step_NMSE[2], step_BIAS[2] = run_adjust(proj, calib_mask, rout_data, calib_param, right_x)
 
                 p_init[pid, :] = [left_x, median_x, right_x]
 
                 if median_y < left_y and median_y < right_y:
-                    step_val = median_y
+                    step_E = median_y
                     opt_site[pid] = 1
                 elif left_y < median_y < right_y:
-                    step_val = left_y
+                    step_E = left_y
                     opt_site[pid] = 0
                 elif left_y > median_y > right_y:
-                    step_val = right_y
+                    step_E = right_y
                     opt_site[pid] = 2
 
                 sorted_y = sorted([left_y, median_y, right_y])
-
                 dy = sorted_y[1] - sorted_y[0]
 
+                NMSE, BIAS = step_NMSE[opt_site[pid]], step_BIAS[opt_site[pid]]
+
                 itr += 1
+                log.info("%s iteration %d, value = %.3f, E = %.3f, NSCE = %.3f, BIAS = %.3f" %
+                         (calib_param, itr, p_init[pid, opt_site[pid]], step_E, 1-NMSE, BIAS))
 
-            log.info("Calibrate %s: value = %.3f, Nsc = %.3f, Bias = %.3f, E = %.3f" %
-                     (calib_param, p_init[pid, opt_site[pid]], 1-NMSE, BIAS, step_val))
+            log.info("%s calibrated, value = %.3f, E = %.3f, NSCE = %.3f, BIAS = %.3f" %
+                     (calib_param, p_init[pid, opt_site[pid]], step_E, 1-NMSE, BIAS))
 
-        log.info("Calibrate result:  Infilt: %.3f, Ds: %.3f, Dsmax: %.3f, \
-                 Ws: %.3f, d2: %.3f, d3: %.3f, E: %.3f, NSC: %.3f, BIAS: %.3f"
-                 % (p_init[0, opt_site[0]], p_init[1, opt_site[1]], p_init[2, opt_site[2]],
+        log.info("Calibrate result of turns %d:  Infilt: %.3f, Ds: %.3f, Dsmax: %.3f, Ws: %.3f,"
+                 " d2: %.3f, d3: %.3f, E: %.3f, NSC: %.3f, BIAS: %.3f"
+                 % (turn+1, p_init[0, opt_site[0]], p_init[1, opt_site[1]], p_init[2, opt_site[2]],
                     p_init[3, opt_site[3]], p_init[4, opt_site[4]], p_init[5, opt_site[5]],
-                    step_val, NMSE, BIAS))
+                    step_E, 1-NMSE, BIAS))
 

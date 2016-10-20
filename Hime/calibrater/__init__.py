@@ -4,13 +4,16 @@
 import logging
 import os
 
-log = logging.getLogger("calib_log")
-
-cmd_log = logging.StreamHandler()
-cmd_log.setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
+console_log = logging.StreamHandler()
+console_log.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s',
+                                           datefmt='%a, %d %b %Y %H:%M:%S'))
 
 file_log = logging.FileHandler(os.path.split(os.path.realpath(__file__))[0] + "/calib_info.log")
-file_log.setLevel(logging.INFO)
+file_log.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s',
+                                        datefmt='%a, %d %b %Y %H:%M:%S'))
 
-log.addHandler(cmd_log)
+log = logging.getLogger("calib")
+
+log.addHandler(console_log)
 log.addHandler(file_log)
