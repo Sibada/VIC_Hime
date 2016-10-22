@@ -5,7 +5,7 @@ from Hime.statistic import nmse, bias
 from Hime.model_execer.vic_execer import vic_exec
 from Hime.routing.confluence import load_rout_data, confluence, gather_to_month
 from Hime.utils import set_value_nc, set_soil_depth
-from . import log
+from Hime import log
 import numpy as np
 import pandas as pd
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#  -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 """
 VIC forcing file creater
@@ -14,6 +14,7 @@ Yang H, Huafang L V, Qingfang H U, et al. Comparison of parametrization methods 
 radiation over the North China Plain[J]. Qinghua Daxue Xuebao/journal of Tsinghua University, 2014, 54(5):590-595.
 """
 
+from Hime import log
 from Hime.version import version as __version__
 from Hime import templates_path
 from Hime.utils import read_template
@@ -54,7 +55,7 @@ def read_stn_data(forcing_params):
     use_sh = forcing_params["use_sh"]
 
     # Read coordinates of stations.
-    print "Reading station coordinates file %s" % coords_path
+    log.info("Reading station coordinates file %s" % coords_path)
     coords = np.array(pd.read_table(coords_path, sep=r"[\s,;]", header=None))
     stn_num = coords.shape[0]
 
@@ -68,7 +69,7 @@ def read_stn_data(forcing_params):
 
     var_data = []
     for variable in variables:
-        print "Reading %s" % variable["path"]
+        log.info("Reading %s" % variable["path"])
         data = np.array(pd.read_table(variable["path"], sep=r"[\s,;]", header=None))
         new_var = OrderedDict({
             "data": data,
@@ -222,7 +223,7 @@ def create_forcing(forcing_data, create_params):
         ff.description = "VIC parameter file created by VIC Hime " + __version__ + " at " +\
                          dt.datetime.now().strftime('%Y-%m-%d, %H:%M:%S')
 
-        print nc_file_name + " has been created to write."
+        log.info(nc_file_name + " has been created to write.")
 
         ff.createDimension("lon", nlon)
         ff.createDimension("lat", nlat)

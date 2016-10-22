@@ -5,6 +5,7 @@
 VIC parameters file creater
 """
 
+from Hime import log
 from Hime.version import version as __version__
 from Hime.utils import read_template
 from Hime.ascii_grid import Grid
@@ -15,7 +16,6 @@ import netCDF4 as nc
 import numpy as np
 import pandas as pd
 import re, json
-import os, sys
 import datetime
 
 
@@ -163,7 +163,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
     # Write parameters file.
     #######################################################################
     params = nc.Dataset(out_params_path, "w", "NETCDF4")
-    print out_params_path
+    log.debug(out_params_path)
 
     params.createDimension("lon", nx)
     params.createDimension("lat", ny)
@@ -213,7 +213,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
         v.description = variable["description"]
         v.units = variable["units"]
 
-        print "Write "+variable["variable"]
+        log.info("Write "+variable["variable"])
         value = np.zeros(nx * ny) - 9999
         if n_value == "Nlayer":
             for l in range(n_layer):
@@ -244,7 +244,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
         v.description = variable["description"]
         v.units = variable["units"]
 
-        print "Write " + variable["variable"]
+        log.info("Write " + variable["variable"])
         value = np.zeros(nx * ny) -9999
         if varname == "Nveg":
             value[sn] = np.array([len(vegs) for vegs in veg.values()])
@@ -289,7 +289,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
     # ----------------------------------------------------------------------
     # Write vegetation library part of parameters file.
     # ----------------------------------------------------------------------
-    veg_lib_part = range(39,52)
+    veg_lib_part = range(39, 52)
     if not veglib_vegcover:
         veg_lib_part.remove(43)
 
@@ -308,7 +308,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
         v.description = variable["description"]
         v.units = variable["units"]
 
-        print "Write " + variable["variable"]
+        log.info("Write " + variable["variable"])
         value = np.zeros(nx * ny) -9999
         if n_value == "veg_class":
             for cla in range(veg_class):
@@ -339,7 +339,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
     # Write domain file.
     #######################################################################
 
-    print "Write domain file"
+    log.info("Writing domain file %s ..." % out_domain_path)
     domain = nc.Dataset(out_domain_path, "w", "NETCDF4")
 
     domain.createDimension("lon", nx)
