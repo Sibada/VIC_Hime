@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from Hime import log
 from .version import version as __version__
 from collections import OrderedDict
 import datetime
 import json
+import os
 
 ########################################################################################################################
 #
@@ -12,7 +14,7 @@ import json
 #
 ########################################################################################################################
 class VicProj(object):
-    def __init__(self, proj_name, proj_path):
+    def __init__(self, proj_name="", proj_path="", create_proj=False):
         self.global_params = OrderedDict()
         self.proj_params = OrderedDict()
 
@@ -30,7 +32,7 @@ class VicProj(object):
         prj_prm["n_cores"] = 4
 
         #######################################################################
-        # VIC self-calibration parameters.
+        # VIC auto-calibration parameters.
         #######################################################################
         calib_param = OrderedDict()
 
@@ -73,7 +75,7 @@ class VicProj(object):
         glo_prm["runoff_steps_per_day"] = 1
         glo_prm["start_time"] = datetime.datetime(1960, 1, 1)
         glo_prm["end_time"] = datetime.datetime(1970, 12, 31)
-        glo_prm["calendar"] = "PROLEPTIC_GREGORIAN"
+        glo_prm["calendar"] = "proleptic_gregorian"
 
         glo_prm["full_energy"] = "FALSE"
         glo_prm["frozen_soil"] = "FALSE"
@@ -81,19 +83,17 @@ class VicProj(object):
         glo_prm["compute_treeline"] = "FALSE"
         glo_prm["veglib_vegcover"] = "FALSE"
         # Domain file.
-        domain = OrderedDict({
-            "file_path": None,
-            "domain_type": {
-                "LAT": "lat",
-                "LON": "lon",
-                "MASK": "mask",
-                "AREA": "area",
-                "FRAC": "frac",
-                "YDIM": "lat",
-                "XDIM": "lon"
-            }
+        glo_prm["domain_path"] = None
+        domain_type = OrderedDict({
+            "LAT": "lat",
+            "LON": "lon",
+            "MASK": "mask",
+            "AREA": "area",
+            "FRAC": "frac",
+            "YDIM": "lat",
+            "XDIM": "lon"
         })
-        glo_prm["domain"] = domain
+        glo_prm["domain_type"] = domain_type
 
         # Forcing files.
         forcing1 = OrderedDict()
@@ -116,8 +116,10 @@ class VicProj(object):
         glo_prm["snow_band"] = "FALSE"
         glo_prm["july_tavg"] = "FALSE"
         glo_prm["organic"] = "FALSE"
+        glo_prm["organic_fract"] = "FALSE"
         glo_prm["baseflow"] = "ARNO"
         glo_prm["LAI_src"] = "FROM_VEGPARAM"
+        glo_prm["nlayer"] = 3
         glo_prm["nodes"] = 3
 
         # Output files.
@@ -126,11 +128,19 @@ class VicProj(object):
             "out_file": "runoff",
             "out_format": "NETCDF4",
             "compress": "FALSE",
-            "aggfreq": ["NDAYS", "1"],
+            "aggfreq": "NDAYS 1",
             "out_var": ["OUT_RUNOFF",
                         "OUT_BASEFLOW"]
         })
         glo_prm["out_file"] = [out_file1]
+
+        #######################################################################
+        # Create new project.
+        #######################################################################
+        if create_proj:
+            if not os.path.exists(proj_path):
+                os.makedirs(proj_path)
+            self.write_proj_file()
 
     ####################################################################################################################
     """
@@ -174,9 +184,8 @@ class VicProj(object):
         out_lines.append("#######################################################################")
         out_lines.append("# DOMAIN INFO")
         out_lines.append("#######################################################################")
-        domain = glo_prm["domain"]
-        out_lines.append("DOMAIN %s" % domain["file_path"])
-        for tp in domain["domain_type"].items():
+        out_lines.append("DOMAIN %s" % glo_prm["domain_path"])
+        for tp in glo_prm["domain_type"].items():
             out_lines.append("DOMAIN_TYPE %s %s" % (tp[0], tp[1]))
         out_lines.append("")
 
@@ -210,8 +219,9 @@ class VicProj(object):
         out_lines.append("SNOW_BAND %s" % glo_prm["snow_band"])
         out_lines.append("BASEFLOW %s" % glo_prm["baseflow"])
         out_lines.append("JULY_TAVG_SUPPLIED %s" % glo_prm["july_tavg"])
-        out_lines.append("ORGANIC_FRACT %s" % glo_prm["organic"])
+        out_lines.append("ORGANIC_FRACT %s" % glo_prm["organic_fract"])
         out_lines.append("LAI_SRC %s" % glo_prm["LAI_src"])
+        out_lines.append("NLAYER %d" % glo_prm["nlayer"])
         out_lines.append("NODES %d" % glo_prm["nodes"])
         out_lines.append("")
 
@@ -224,7 +234,7 @@ class VicProj(object):
             out_lines.append("OUTFILE %s" % out_file["out_file"])
             out_lines.append("OUT_FORMAT %s" % out_file["out_format"])
             out_lines.append("COMPRESS %s" % out_file["compress"] )
-            out_lines.append("AGGFREQ %s %s" %  tuple(out_file["aggfreq"]))
+            out_lines.append("AGGFREQ %s" %  out_file["aggfreq"])
             for var in out_file["out_var"]:
                 out_lines.append("OUTVAR %s" % var)
             out_lines.append("")
@@ -234,19 +244,17 @@ class VicProj(object):
         of = open(out_global_file, "w")
         of.writelines(out_lines)
         of.close()
-        print "File %s have been write."% out_global_file
+        log.info("File \"%s\" have been write."% out_global_file)
 
     ####################################################################################################################
     '''
     Write out project parameters file.
     '''
-    def write_proj_file(self, out_proj_file = None):
+    def write_proj_file(self, out_proj_file=None):
         glo_prm_cp = self.global_params.copy()
         prj_prm_cp = self.proj_params.copy()
         glo_prm_cp["start_time"] = glo_prm_cp["start_time"].strftime('%Y-%m-%d %H:%M:%S')
         glo_prm_cp["end_time"] = glo_prm_cp["end_time"].strftime('%Y-%m-%d %H:%M:%S')
-        prj_prm_cp["creater_params"]["forcing_date"] = \
-            prj_prm_cp["creater_params"]["forcing_date"].strftime('%Y-%m-%d %H:%M:%S')
 
         proj = OrderedDict({
             "proj_params": prj_prm_cp,
@@ -261,7 +269,6 @@ class VicProj(object):
         pf = open(out_proj_file, "w")
         pf.write(proj_json)
         pf.close()
-
 
     ####################################################################################################################
     '''
@@ -282,11 +289,8 @@ class VicProj(object):
                                                                       '%Y-%m-%d %H:%M:%S')
         self.global_params["end_time"] = datetime.datetime.strptime(self.global_params["end_time"],
                                                                     '%Y-%m-%d %H:%M:%S')
-        self.proj_params["creater_params"]["forcing_date"] = \
-            datetime.datetime.strptime(self.proj_params["creater_params"]["forcing_date"],'%Y-%m-%d %H:%M:%S')
 
         return self
-
 
     ####################################################################################################################
     #

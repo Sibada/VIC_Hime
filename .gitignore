@@ -6,3 +6,5 @@ test.py
 deal.py
 *.pyc
 *.log
+*.vic_proj
+
