@@ -4,15 +4,15 @@
 
 from Hime import version as __version__
 from Hime import templates_path
-
-import os
-import sys
-import re
+from Hime import log
+from Hime.model_execer.vic_execer import vic_exec
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from Hime import log
 from collections import OrderedDict
+import os
+import sys
+import re
 
 group_ss = "QGroupBox{border-radius: 5px; border: 2px groove lightgrey; margin-top: 1.2ex;font-family:serif}" \
            "QGroupBox::title {subcontrol-origin: margin;subcontrol-position: top left; left:15px;}"
@@ -260,6 +260,9 @@ class GlobalConfig(QWidget):
 
         self.setLayout(main_layout)
 
+        #######################################################################
+        # Actions of file dialogs (Setting path).
+        #######################################################################
         self.connect(self.vic_driver_btn, SIGNAL("clicked()"),
                      lambda: self.set_file_by_dialog(line_edit=self.vic_driver_le, disc="Set VIC driver path"))
 
@@ -277,7 +280,12 @@ class GlobalConfig(QWidget):
 
         self.connect(self.forcing_path_btn, SIGNAL("clicked()"), self.set_forcing_path)
 
+        #######################################################################
+        # Saving, writing global file, and others.
+        #######################################################################
         self.connect(self.save_btn, SIGNAL("clicked()"), self.save_setting)
+
+        self.connect(self.create_global_btn, SIGNAL("clicked()"), self.write_global_file)
 
         self.connect(self.add_forcing_btn, SIGNAL("clicked()"), lambda: self.add_item(table=self.forcing_table))
         self.connect(self.remove_forcing_btn, SIGNAL("clicked()"), lambda: self.remove_item(table=self.forcing_table))
@@ -285,12 +293,10 @@ class GlobalConfig(QWidget):
         self.connect(self.add_outputs_btn, SIGNAL("clicked()"), lambda: self.add_item(table=self.output_table))
         self.connect(self.remove_outputs_btn, SIGNAL("clicked()"), lambda: self.remove_item(table=self.output_table))
 
-        self.connect(self.create_global_btn, SIGNAL("clicked()"), self.write_global_file)
-
         #######################################################################
         # Parameters
         #######################################################################
-        #
+        # TODO
 
     def set_params(self):
         proj_params = self.parent.proj.proj_params
@@ -490,3 +496,88 @@ class GlobalConfig(QWidget):
     def write_global_file(self):
         self.parent.proj.write_global_file()
 
+
+########################################################################################################################
+#
+# The second panel of main interface of VIC Hime.
+# Mainly to run VIC model.
+#
+########################################################################################################################
+class VicRun(QWidget):
+    def __init__(self, parent=None):
+        super(VicRun, self).__init__(parent)
+        self.parent = parent
+
+        self.global_path_le = QLineEdit()
+        self.global_path_btn = QPushButton("...")
+        self.global_path_btn.setFixedWidth(36)
+
+        self.rout_cb = QCheckBox("With routing")
+        self.rout_data_path_le = QLineEdit()
+        self.rout_data_path_btn = QPushButton("...")
+        self.rout_data_path_btn.setFixedWidth(36)
+
+        self.rout_out_path_le = QLineEdit()
+        self.rout_out_path_btn = QPushButton("...")
+        self.rout_out_path_btn.setFixedWidth(36)
+
+        self.vic_output_path_le = QLineEdit()
+        self.vic_output_path_btn = QPushButton("...")
+        self.vic_output_path_btn.setFixedWidth(36)
+        self.mpi_cb = QCheckBox("Run with MPI")
+        self.run_btn = QPushButton("Run VIC")
+
+        control_layout = QGridLayout()
+        control_layout.addWidget(QLabel("Global file path:"), 0, 0)
+        control_layout.addWidget(self.global_path_le, 0, 1, 1, 3)
+        control_layout.addWidget(self.global_path_btn, 0, 4, 1, 1)
+        control_layout.addWidget(self.rout_cb)
+        control_layout.addWidget(QLabel("VIC output file path:"), 2, 0)
+        control_layout.addWidget(self.vic_output_path_le, 2, 1, 1, 3)
+        control_layout.addWidget(self.vic_output_path_btn, 2, 4, 1, 1)
+        control_layout.addWidget(QLabel("Routing data file path:"), 2, 0)
+        control_layout.addWidget(self.rout_data_path_le, 3, 1, 1, 3)
+        control_layout.addWidget(self.rout_data_path_btn, 3, 4, 1, 1)
+        control_layout.addWidget(QLabel("Routing output file path:"), 3, 0)
+        control_layout.addWidget(self.rout_out_path_le, 4, 1, 1, 3)
+        control_layout.addWidget(self.rout_out_path_btn, 4, 4, 1, 1)
+        control_layout.addWidget(self.mpi_cb, 5, 5, 1, 2)
+        control_layout.addWidget(self.run_btn, 5, 7, 1, 1)
+
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(control_layout)
+        main_layout.addStretch(1)
+
+        self.setLayout(main_layout)
+
+        self.connect(self.global_path_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.global_path_le, disc="Set global file path"))
+        self.connect(self.vic_output_path_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.vic_output_path_le, disc="Set VIC output file path."))
+        self.connect(self.rout_data_path_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.rout_data_path_le, disc="Set routing data path."))
+        self.connect(self.rout_out_path_btn, SIGNAL("clicked()"),
+                     lambda: self.set_dir_by_dialog(line_edit=self.rout_out_path_le, disc="Set routing output path."))
+
+        #######################################################################
+        # Business part
+        #######################################################################
+        self.vic_running = False
+
+    def set_file_by_dialog(self, line_edit, disc):
+        file = QFileDialog.getOpenFileName(self, disc)
+        log.debug("Open file: %s" % file)
+        if file == "":
+            return
+        line_edit.setText(file)
+
+    def set_dir_by_dialog(self, line_edit, disc):
+        dir = QFileDialog.getExistingDirectory(self, disc)
+        log.debug("Open directory: %s" % dir)
+        if dir == "":
+            return
+        line_edit.setText(dir)
+
+    def run_vic(self):
+        # TODO Add an thread to run VIC, and set the status to "RUNNING"
+        pass

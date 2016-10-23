@@ -11,7 +11,7 @@ import logging
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from interfaces import GlobalConfig
+from interfaces import GlobalConfig, VicRun
 
 from Hime import log
 from Hime.vic_proj import VicProj
@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
         # Tabs.
         #######################################################################
         self.global_config = GlobalConfig(self)
+        self.vic_run = VicRun(self)
 
         self.run_layout = QVBoxLayout()
         self.calib_layout = QVBoxLayout()
@@ -60,7 +61,7 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         tabs.setMinimumSize(600, 640)
         tabs.addTab(self.global_config, "Global setting")
-        tabs.addTab(self.make_tab(self.run_layout), "Run VIC")
+        tabs.addTab(self.vic_run, "Run VIC")
         tabs.addTab(self.make_tab(self.calib_layout), "Calibrate")
         tabs.addTab(self.make_tab(self.rout_layout), "Routing")
         tabs.addTab(self.make_tab(self.file_layout), "Input file create")
@@ -82,7 +83,7 @@ class MainWindow(QMainWindow):
         # Main window configs
         #######################################################################
         self.resize(1080, 680)
-        self.setWindowTitle("VIC Hime - VIC project manager Ver." + __version__)
+        self.setWindowTitle("VIC Hime " + __version__)
         main_widget = QWidget(self)
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
