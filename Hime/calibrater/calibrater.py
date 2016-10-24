@@ -38,7 +38,7 @@ def try_run_vic(proj, rout_data):
 
     # Run VIC
     ncores = proj.get_ncores()
-    sta_code = vic_exec(driver, global_file, log_path=None, mpi=mpi, n_proc=ncores)
+    sta_code = vic_exec(driver, global_file, log_path=None, mpi=mpi, n_cores=ncores)
     if sta_code != 0:
         raise ValueError("VIC run fail. Return %d" % sta_code)
 

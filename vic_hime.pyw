@@ -11,7 +11,7 @@ import logging
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from interfaces import GlobalConfig, VicRun
+from interfaces import GlobalConfig, VicRun, Routing
 
 from Hime import log
 from Hime.vic_proj import VicProj
@@ -46,10 +46,10 @@ class MainWindow(QMainWindow):
         #######################################################################
         # Tabs.
         #######################################################################
-        self.global_config = GlobalConfig(self)
-        self.vic_run = VicRun(self)
+        self.global_config_panel = GlobalConfig(self)
+        self.vic_run_panel = VicRun(self)
+        self.routing_panel = Routing(self)
 
-        self.run_layout = QVBoxLayout()
         self.calib_layout = QVBoxLayout()
         self.rout_layout = QVBoxLayout()
         self.file_layout = QVBoxLayout()
@@ -60,10 +60,10 @@ class MainWindow(QMainWindow):
         #######################################################################
         tabs = QTabWidget()
         tabs.setMinimumSize(600, 640)
-        tabs.addTab(self.global_config, "Global setting")
-        tabs.addTab(self.vic_run, "Run VIC")
-        tabs.addTab(self.make_tab(self.calib_layout), "Calibrate")
-        tabs.addTab(self.make_tab(self.rout_layout), "Routing")
+        tabs.addTab(self.global_config_panel, "Global setting")
+        tabs.addTab(self.vic_run_panel, "Run VIC")
+        tabs.addTab(self.routing_panel, "Routing")
+        tabs.addTab(self.make_tab(self.rout_layout), "Calibrate")
         tabs.addTab(self.make_tab(self.file_layout), "Input file create")
 
         self.log_console = QTextBrowser()
@@ -165,7 +165,9 @@ class MainWindow(QMainWindow):
                                                  QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes:
                 log.info("Create VIC project %s" % proj_name)
                 self.proj = VicProj(proj_name, proj_path, True)
-                self.global_config.set_params()
+
+                self.global_config_panel.load_configs()
+                self.vic_run_panel.load_configs()
 
     def open_proj(self):
         proj_file = QFileDialog.getOpenFileName(self, "Select project file.",
@@ -176,12 +178,14 @@ class MainWindow(QMainWindow):
         self.proj = VicProj()
         self.proj = self.proj.read_proj_file(proj_file)
 
-        self.global_config.set_params()
+        self.global_config_panel.load_configs()
+        self.vic_run_panel.load_configs()
 
     def save_proj(self):
         if self.proj is None:
             log.error("Have not open any project.")
             return
+
         self.proj.write_proj_file()
         log.info("Changes have saved.")
 

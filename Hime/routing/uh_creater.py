@@ -92,8 +92,8 @@ def next_cell(direc, arc_dir_code=False):
 #
 ########################################################################################################################
 def discovery_basin(station, next_x, next_y):
-    stn_x = station["x"]
-    stn_y = station["y"]
+    stn_x = station["x"] - 1
+    stn_y = station["y"] - 1
 
     nrow = next_x.shape[0]
     ncol = next_x.shape[1]
@@ -122,7 +122,7 @@ def discovery_basin(station, next_x, next_y):
                     break
                 if in_basin[iy, ix] > 0:
                     basin.append([x, y])
-                    in_basin[iy, ix] = 1
+                    in_basin[y, x] = 1
                     break
                 if next_x[iy, ix] <= 0:
                     break
@@ -256,6 +256,7 @@ def create_rout(rout_info):
     uh_cell = create_uh_cell(basin, station, uh_m, next_x, next_y, uh_slope)
 
     rout_data = OrderedDict()
+    rout_data["name"] = station["name"]
     rout_data["basin"] = basin
     sn = xy_to_sn(basin[:, 0], basin[:, 1])
     rout_data["sn"] = sn

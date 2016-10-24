@@ -6,10 +6,13 @@ from Hime import version as __version__
 from Hime import templates_path
 from Hime import log
 from Hime.model_execer.vic_execer import vic_exec
+from Hime.routing.uh_creater import create_rout
+from Hime.routing.confluence import write_rout_data, load_rout_data, confluence
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from collections import OrderedDict
+from datetime import datetime as dt
 import os
 import sys
 import re
@@ -298,7 +301,7 @@ class GlobalConfig(QWidget):
         #######################################################################
         # TODO
 
-    def set_params(self):
+    def load_configs(self):
         proj_params = self.parent.proj.proj_params
         global_params = self.parent.proj.global_params
         self.vic_driver_le.setText(unicode(proj_params["vic_image_driver"]))
@@ -389,7 +392,7 @@ class GlobalConfig(QWidget):
                 self.output_table.setItem(r, 3, QTableWidgetItem(f["aggfreq"]))
                 r += 1
 
-    def get_params(self):
+    def apply_configs(self):
         proj_params = self.parent.proj.proj_params
         global_params = self.parent.proj.global_params
         proj_params["vic_image_driver"] = unicode(self.vic_driver_le.text())
@@ -452,7 +455,7 @@ class GlobalConfig(QWidget):
             current_info["out_var"].append(out_var)
 
     def save_setting(self):
-        self.get_params()
+        self.apply_configs()
         self.parent.proj.write_proj_file()
         log.info("Changes have saved.")
 
@@ -507,62 +510,100 @@ class VicRun(QWidget):
     def __init__(self, parent=None):
         super(VicRun, self).__init__(parent)
         self.parent = parent
+        #######################################################################
+        # Driver config group
+        #######################################################################
+        self.vic_driver_le = QLineEdit()
+        self.vic_driver_le.setMinimumWidth(128)
 
-        self.global_path_le = QLineEdit()
-        self.global_path_btn = QPushButton("...")
-        self.global_path_btn.setFixedWidth(36)
+        self.cores_le = QLineEdit()
+        self.cores_le.setFixedWidth(36)
+
+        self.vic_driver_btn = QPushButton("...")
+        self.vic_driver_btn.setFixedWidth(36)
+
+        driver_group = QGroupBox()
+        driver_group.setStyleSheet(group_ss)
+        driver_group.setTitle("VIC driver")
+        driver_group.setMinimumWidth(420)
+
+        driver_layout = QHBoxLayout()
+        driver_group.setLayout(driver_layout)
+
+        driver_layout.addWidget(QLabel("VIC driver path:"))
+        driver_layout.addWidget(self.vic_driver_le)
+        driver_layout.addWidget(self.vic_driver_btn)
+        driver_layout.addStretch(1)
+        driver_layout.addWidget(QLabel("Cores:"))
+        driver_layout.addWidget(self.cores_le)
+
+        #######################################################################
+        # Input file config group
+        #######################################################################
+
+        self.global_file_le = QLineEdit()
+        self.global_file_btn = QPushButton("...")
+        self.global_file_btn.setFixedWidth(36)
 
         self.rout_cb = QCheckBox("With routing")
-        self.rout_data_path_le = QLineEdit()
-        self.rout_data_path_btn = QPushButton("...")
-        self.rout_data_path_btn.setFixedWidth(36)
+        self.rout_data_le = QLineEdit()
+        self.rout_data_btn = QPushButton("...")
+        self.rout_data_btn.setFixedWidth(36)
 
         self.rout_out_path_le = QLineEdit()
         self.rout_out_path_btn = QPushButton("...")
         self.rout_out_path_btn.setFixedWidth(36)
 
-        self.vic_output_path_le = QLineEdit()
-        self.vic_output_path_btn = QPushButton("...")
-        self.vic_output_path_btn.setFixedWidth(36)
-        self.mpi_cb = QCheckBox("Run with MPI")
-        self.run_btn = QPushButton("Run VIC")
+        self.vic_output_le = QLineEdit()
+        self.vic_output_btn = QPushButton("...")
+        self.vic_output_btn.setFixedWidth(36)
 
-        control_layout = QGridLayout()
-        control_layout.addWidget(QLabel("Global file path:"), 0, 0)
-        control_layout.addWidget(self.global_path_le, 0, 1, 1, 3)
-        control_layout.addWidget(self.global_path_btn, 0, 4, 1, 1)
-        control_layout.addWidget(self.rout_cb)
-        control_layout.addWidget(QLabel("VIC output file path:"), 2, 0)
-        control_layout.addWidget(self.vic_output_path_le, 2, 1, 1, 3)
-        control_layout.addWidget(self.vic_output_path_btn, 2, 4, 1, 1)
-        control_layout.addWidget(QLabel("Routing data file path:"), 2, 0)
-        control_layout.addWidget(self.rout_data_path_le, 3, 1, 1, 3)
-        control_layout.addWidget(self.rout_data_path_btn, 3, 4, 1, 1)
-        control_layout.addWidget(QLabel("Routing output file path:"), 3, 0)
-        control_layout.addWidget(self.rout_out_path_le, 4, 1, 1, 3)
-        control_layout.addWidget(self.rout_out_path_btn, 4, 4, 1, 1)
-        control_layout.addWidget(self.mpi_cb, 5, 5, 1, 2)
-        control_layout.addWidget(self.run_btn, 5, 7, 1, 1)
+        self.apply_configs_btn = QPushButton("&Apply configs")
+        self.mpi_cb = QCheckBox("Run with MPI")
+        self.run_btn = QPushButton("&Run VIC")
+
+        self.vic_run_console = QTextBrowser()
+
+        input_file_group = QGroupBox()
+        input_file_group.setStyleSheet(group_ss)
+        input_file_group.setTitle("Input file")
+        input_file_group.setMinimumWidth(420)
+
+        input_file_layout = QGridLayout()
+        input_file_layout.addWidget(QLabel("Global file:"), 0, 0)
+        input_file_layout.addWidget(self.global_file_le, 0, 1, 1, 3)
+        input_file_layout.addWidget(self.global_file_btn, 0, 4, 1, 1)
+        input_file_layout.addWidget(self.rout_cb, 1, 0, 1, 1)
+
+        input_file_layout.addWidget(self.mpi_cb, 1, 2, 1, 1)
+        input_file_layout.addWidget(self.run_btn, 5, 7, 1, 1)
+
+        input_file_group.setLayout(input_file_layout)
 
         main_layout = QVBoxLayout()
-        main_layout.addLayout(control_layout)
-        main_layout.addStretch(1)
-
+        main_layout.addWidget(driver_group)
+        main_layout.addWidget(input_file_group)
+        # main_layout.addStretch(1)
+        main_layout.addWidget(self.vic_run_console)
         self.setLayout(main_layout)
 
-        self.connect(self.global_path_btn, SIGNAL("clicked()"),
-                     lambda: self.set_file_by_dialog(line_edit=self.global_path_le, disc="Set global file path"))
-        self.connect(self.vic_output_path_btn, SIGNAL("clicked()"),
-                     lambda: self.set_file_by_dialog(line_edit=self.vic_output_path_le, disc="Set VIC output file path."))
-        self.connect(self.rout_data_path_btn, SIGNAL("clicked()"),
-                     lambda: self.set_file_by_dialog(line_edit=self.rout_data_path_le, disc="Set routing data path."))
+        self.connect(self.global_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.global_file_le, disc="Set global file path"))
+        self.connect(self.vic_output_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.vic_output_le, disc="Set VIC output file path."))
+        self.connect(self.rout_data_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.rout_data_le, disc="Set routing data path."))
         self.connect(self.rout_out_path_btn, SIGNAL("clicked()"),
                      lambda: self.set_dir_by_dialog(line_edit=self.rout_out_path_le, disc="Set routing output path."))
+
+        self.connect(self.run_btn, SIGNAL("clicked()"), self.start_vic)
 
         #######################################################################
         # Business part
         #######################################################################
+        self.configs = None
         self.vic_running = False
+        self.vic_run_thread = VICRunThread(self)
 
     def set_file_by_dialog(self, line_edit, disc):
         file = QFileDialog.getOpenFileName(self, disc)
@@ -579,5 +620,353 @@ class VicRun(QWidget):
         line_edit.setText(dir)
 
     def run_vic(self):
-        # TODO Add an thread to run VIC, and set the status to "RUNNING"
-        pass
+        if self.rout_cb.isChecked() and self.parent.proj.proj_params.get("routing_config") is None:
+            log.error("Routing configs was not set. Can not run with routing.")
+            return
+
+        vic_path = unicode(self.vic_driver_le.text())
+        n_cores = unicode(self.cores_le.text())
+        use_mpi = True if self.mpi_cb.isChecked() else False
+        status = vic_exec(vic_path, unicode(self.global_file_le.text()), mpi=use_mpi, n_cores=int(n_cores))
+        if status != 0:
+            log.error("Error in VIC running.")
+            return
+
+        log.info("VIC running complete.")
+        if self.rout_cb.isChecked():
+            pass
+        log.info("Routing complete.")
+
+    def start_vic(self):
+        self.vic_run_thread.start()
+
+    def apply_configs(self):
+        self.configs["vic_driver_path"] = unicode(self.vic_driver_le.text())
+        self.configs["n_cores"] = unicode(self.cores_le.text())
+        self.configs["global_file"] = unicode(self.global_file_le.text())
+
+        if self.mpi_cb.isChecked():
+            self.configs["with_mpi"] = True
+        else:
+            self.configs["with_mpi"] = False
+
+        if self.rout_cb.isChecked():
+            self.configs["with_routing"] = True
+        else:
+            self.configs["with_routing"] = False
+
+        self.parent.proj.proj_params["vic_run_config"] = self.configs
+
+    def load_configs(self):
+        if self.parent.proj.proj_params.get("vic_run_config") is None:
+            self.configs = OrderedDict()
+            self.configs["vic_driver_path"] = "None"
+            self.configs["n_cores"] = "4"
+            self.configs["global_file"] = self.parent.proj.proj_params["global_file"]
+            self.configs["with_mpi"] = False
+            self.configs["with_routing"] = False
+        else:
+            self.configs = self.parent.proj.proj_params["vic_run_config"]
+
+        self.vic_driver_le.setText(self.configs["vic_driver_path"])
+        self.cores_le.setText(self.configs["n_cores"])
+        self.global_file_le.setText(self.configs["global_file"])
+
+        if self.configs["with_mpi"]:
+            self.mpi_cb.setCheckState(Qt.Checked)
+        else:
+            self.mpi_cb.setCheckState(Qt.Unchecked)
+
+        if self.configs["with_routing"]:
+            self.rout_cb.setCheckState(Qt.Checked)
+        else:
+            self.rout_cb.setCheckState(Qt.Unchecked)
+
+
+########################################################################################################################
+#
+# The second panel of main interface of VIC Hime.
+# Mainly to run VIC model.
+#
+########################################################################################################################
+class Routing(QWidget):
+    def __init__(self, parent=None):
+        super(Routing, self).__init__(parent)
+        self.parent = parent
+        #######################################################################
+        # Rout data creating group
+        #######################################################################
+        self.direc_file_le = QLineEdit()
+        self.direc_file_btn = QPushButton("...")
+        self.direc_file_btn.setFixedWidth(36)
+
+        self.veloc_file_le = QLineEdit()
+        self.veloc_file_btn = QPushButton("...")
+        self.veloc_file_btn.setFixedWidth(36)
+
+        self.diffu_file_le = QLineEdit()
+        self.diffu_file_btn = QPushButton("...")
+        self.diffu_file_btn.setFixedWidth(36)
+
+        self.uh_slope_data_le = QLineEdit()
+        self.uh_slope_data_btn = QPushButton("...")
+        self.uh_slope_data_btn.setFixedWidth(36)
+
+        self.out_rout_data_le = QLineEdit()
+        self.out_rout_data_btn = QPushButton("...")
+        self.out_rout_data_btn.setFixedWidth(36)
+
+        self.stn_name_le = QLineEdit()
+        self.stn_name_le.setFixedWidth(128)
+
+        self.stn_x_le = QLineEdit()
+        self.stn_x_le.setFixedWidth(36)
+        self.stn_y_le = QLineEdit()
+        self.stn_y_le.setFixedWidth(36)
+
+        self.create_rout_data_btn = QPushButton("&Create rout data")
+
+        rout_data_group = QGroupBox()
+        rout_data_group.setStyleSheet(group_ss)
+        rout_data_layout = QGridLayout()
+        rout_data_group.setLayout(rout_data_layout)
+        rout_data_group.setTitle("Rout data create")
+        rout_data_layout.addWidget(QLabel("Direction file:"), 0, 0)
+        rout_data_layout.addWidget(self.direc_file_le, 0, 1, 1, 10)
+        rout_data_layout.addWidget(self.direc_file_btn, 0, 11, 1, 1)
+        rout_data_layout.addWidget(QLabel("Velocity file:"), 1, 0)
+        rout_data_layout.addWidget(self.veloc_file_le, 1, 1, 1, 10)
+        rout_data_layout.addWidget(self.veloc_file_btn, 1, 11, 1, 1)
+        rout_data_layout.addWidget(QLabel("Diffusion file:"), 2, 0)
+        rout_data_layout.addWidget(self.diffu_file_le, 2, 1, 1, 10)
+        rout_data_layout.addWidget(self.diffu_file_btn, 2, 11, 1, 1)
+        rout_data_layout.addWidget(QLabel("Slope UH file:"), 3, 0)
+        rout_data_layout.addWidget(self.uh_slope_data_le, 3, 1, 1, 10)
+        rout_data_layout.addWidget(self.uh_slope_data_btn, 3, 11, 1, 1)
+        rout_data_layout.addWidget(QLabel("Station name:"), 4, 0)
+        rout_data_layout.addWidget(self.stn_name_le, 4, 1, 1, 3)
+        rout_data_layout.addWidget(QLabel("Station location  Column:"), 5, 0, 1, 2)
+        rout_data_layout.addWidget(self.stn_x_le, 5, 2)
+        rout_data_layout.addWidget(QLabel("Row:"), 5, 3)
+        rout_data_layout.addWidget(self.stn_y_le, 5, 4)
+        rout_data_layout.addWidget(QLabel("Rout data output path:"), 6, 0, 1, 2)
+        rout_data_layout.addWidget(self.out_rout_data_le, 6, 2, 1, 9)
+        rout_data_layout.addWidget(self.out_rout_data_btn, 6, 11, 1, 1)
+        rout_data_layout.addWidget(self.create_rout_data_btn, 7, 10, 1, 2)
+
+        #######################################################################
+        # Routing group
+        #######################################################################
+        self.vic_out_file_le = QLineEdit()
+        self.vic_out_file_btn = QPushButton("...")
+        self.vic_out_file_btn.setFixedWidth(36)
+
+        self.domain_file_le = QLineEdit()
+        self.domain_file_btn = QPushButton("...")
+        self.domain_file_btn.setFixedWidth(36)
+
+        self.rout_data_file_le = QLineEdit()
+        self.rout_data_file_btn = QPushButton("...")
+        self.rout_data_file_btn.setFixedWidth(36)
+
+        self.rout_out_dir_le = QLineEdit()
+        self.rout_out_dir_btn = QPushButton("...")
+        self.rout_out_dir_btn.setFixedWidth(36)
+
+        self.start_date_de = QDateTimeEdit()
+        self.start_date_de.setDisplayFormat("yyyy-MM-dd")
+        self.end_date_de = QDateTimeEdit()
+        self.end_date_de.setDisplayFormat("yyyy-MM-dd")
+
+        self.apply_configs_btn = QPushButton("&Apply configs")
+        self.routing_btn = QPushButton("&Routing")
+
+        routing_group = QGroupBox()
+        routing_group.setStyleSheet(group_ss)
+        routing_group.setTitle("Routing")
+        routing_layout = QGridLayout()
+        routing_group.setLayout(routing_layout)
+        routing_layout.addWidget(QLabel("VIC output file:"), 0, 0)
+        routing_layout.addWidget(self.vic_out_file_le, 0, 1, 1, 8)
+        routing_layout.addWidget(self.vic_out_file_btn, 0, 9)
+        routing_layout.addWidget(QLabel("Domain file:"), 1, 0)
+        routing_layout.addWidget(self.domain_file_le, 1, 1, 1, 8)
+        routing_layout.addWidget(self.domain_file_btn, 1, 9)
+        routing_layout.addWidget(QLabel("Rout data file:"), 2, 0)
+        routing_layout.addWidget(self.rout_data_file_le, 2, 1, 1, 8)
+        routing_layout.addWidget(self.rout_data_file_btn, 2, 9)
+        routing_layout.addWidget(QLabel("Start date:"), 3, 0)
+        routing_layout.addWidget(self.start_date_de, 3, 1, 1, 3)
+        routing_layout.addWidget(QLabel("End date:"), 4, 0)
+        routing_layout.addWidget(self.end_date_de, 4, 1, 1, 3)
+        routing_layout.addWidget(QLabel("Routing output path:"), 5, 0, 1, 2)
+        routing_layout.addWidget(self.rout_out_dir_le, 5, 2, 1, 7)
+        routing_layout.addWidget(self.rout_out_dir_btn, 5, 9)
+
+        routing_layout.addWidget(self.apply_configs_btn, 6, 6, 1, 2)
+        routing_layout.addWidget(self.routing_btn, 6, 8, 1, 2)
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(rout_data_group)
+        main_layout.addWidget(routing_group)
+        self.setLayout(main_layout)
+
+        self.connect(self.direc_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.direc_file_le, disc="Set flow direction file path"))
+        self.connect(self.veloc_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.veloc_file_le, disc="Set velocity file path"))
+        self.connect(self.diffu_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.direc_file_le, disc="Set diffusion file path"))
+        self.connect(self.uh_slope_data_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.uh_slope_data_le, disc="Set Slope UH file path"))
+        self.connect(self.out_rout_data_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.out_rout_data_le, disc="Set Slope UH file path"))
+        self.connect(self.vic_out_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.vic_out_file_le, disc="Set Slope UH file path"))
+        self.connect(self.domain_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.domain_file_le, disc="Set Slope UH file path"))
+        self.connect(self.rout_data_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.rout_data_file_le, disc="Set Slope UH file path"))
+        self.connect(self.rout_out_dir_btn, SIGNAL("clicked()"),
+                     lambda: self.set_dir_by_dialog(line_edit=self.rout_out_dir_le, disc="Set Slope UH file path"))
+
+        self.connect(self.create_rout_data_btn, SIGNAL("clicked()"), self.create_rout_data)
+        self.connect(self.apply_configs_btn, SIGNAL("clicked()"), self.apply_configs)
+        self.connect(self.routing_btn, SIGNAL("clicked()"), self.routing)
+
+    def set_file_by_dialog(self, line_edit, disc):
+        file = QFileDialog.getOpenFileName(self, disc)
+        log.debug("Open file: %s" % file)
+        if file == "":
+            return
+        line_edit.setText(file)
+
+    def set_dir_by_dialog(self, line_edit, disc):
+        dir = QFileDialog.getExistingDirectory(self, disc)
+        log.debug("Open directory: %s" % dir)
+        if dir == "":
+            return
+        line_edit.setText(dir)
+
+    def apply_configs(self):
+        self.configs["direc_file"] = unicode(self.direc_file_le.text())
+        self.configs["veloc_file"] = unicode(self.veloc_file_le.text())
+        self.configs["diffu_file"] = unicode(self.diffu_file_le.text())
+        self.configs["uh_slope"] = unicode(self.uh_slope_data_le.text())
+        self.configs["station_name"] = unicode(self.stn_name_le.text())
+        self.configs["station_row"] = unicode(self.stn_x_le.text())
+        self.configs["station_col"] = unicode(self.stn_y_le.text())
+        self.configs["out_rout_data"] = unicode(self.out_rout_data_le.text())
+        self.configs["vic_out_file"] = unicode(self.vic_out_file_le.text())
+        self.configs["domain_file"] = unicode(self.domain_file_le.text())
+        self.configs["rout_data_file"] = unicode(self.rout_data_file_le.text())
+        self.configs["rout_output_dir"] = unicode(self.rout_out_dir_le.text())
+
+        self.configs["start_date"] = list(self.start_date_de.date().getDate())
+        self.configs["end_date"] = list(self.end_date_de.date().getDate())
+
+        self.parent.proj.proj_params["routing_config"] = self.configs
+
+    def load_configs(self):
+        if self.parent.proj.proj_params.get("routing_config") is None:
+            self.configs = OrderedDict()
+            self.configs["direc_file"] = "None"
+            self.configs["veloc_file"] = "1.5"
+            self.configs["diffu_file"] = "800"
+            self.configs["uh_slope"] = "from_template"
+            self.configs["station_name"] = "NONE"
+            self.configs["station_row"] = 0
+            self.configs["station_col"] = 0
+            self.configs["out_rout_data"] = "None"
+
+            self.configs["vic_out_file"] = "None"
+            self.configs["domain_file"] = "None"
+            self.configs["rout_data_file"] = "None"
+            self.configs["rout_output_dir"] = "None"
+            self.configs["start_date"] = [1960, 1, 1]
+            self.configs["start_date"] = [1970, 12, 31]
+
+        else:
+            self.configs = self.parent.proj.proj_params["routing_config"]
+
+        self.direc_file_le.setText(self.configs["direc_file"])
+        self.veloc_file_le.setText(self.configs["veloc_file"])
+        self.diffu_file_le.setText(self.configs["diffu_file"])
+        self.uh_slope_data_le.setText(self.configs["uh_slope"])
+        self.stn_name_le.setText(self.configs["station_name"])
+        self.stn_x_le.setText(self.configs["station_row"])
+        self.stn_y_le.setText(self.configs["station_col"])
+        self.out_rout_data_le.setText(self.configs["out_rout_data"])
+
+        self.vic_out_file_le.setText(self.configs["vic_out_file"])
+        self.domain_file_le.setText(self.configs["domain_file"])
+        self.rout_data_file_le.setText(self.configs["rout_data_file"])
+        self.rout_out_dir_le.setText(self.configs["rout_output_dir"])
+        sdt = self.configs["start_date"]
+        self.start_date_de.setDateTime(dt(sdt[0], sdt[1], sdt[2]))
+        edt = self.configs["end_date"]
+        self.end_date_de.setDateTime(dt(edt[0], edt[1], edt[2]))
+
+    def create_rout_data(self):
+        rout_info = {
+            "arc_dir_code": True,
+            "direc": unicode(self.direc_file_le.text()),
+            "veloc": unicode(self.veloc_file_le.text()),
+            "diffu": unicode(self.diffu_file_le.text()),
+            "station": {
+                "name": unicode(self.stn_name_le.text()),
+                "x": unicode(self.stn_x_le.text()),
+                "y": unicode(self.stn_y_le.text())
+            },
+            "uh_slope": unicode(self.uh_slope_data_le.text())
+        }
+
+        try:
+            rout_info["veloc"] = float(rout_info["veloc"])
+        except ValueError:
+            pass
+        try:
+            rout_info["diffu"] = float(rout_info["diffu"])
+        except ValueError:
+            pass
+
+        rout_data = create_rout(rout_info)
+        write_rout_data(rout_data, unicode(self.out_rout_data_le.text()))
+
+    def routing(self):
+        rout_data = load_rout_data(unicode(self.rout_data_file_le.text()))
+        confluence(unicode(self.vic_out_file_le.text()), rout_data, unicode(self.domain_file_le.text()),
+                   self.start_date_de.dateTime().toPyDateTime(), self.start_date_de.dateTime().toPyDateTime())
+
+
+class VICRunThread(QThread):
+    def __init__(self, parent=None):
+        super(VICRunThread, self).__init__(parent)
+        self.parent = parent
+
+    def run(self):
+        log.info("VIC start to run...")
+
+        self.parent.vic_running = True
+        sys.stdout = StreamEmitter(text_written=self.output_writen)
+        sys.stderr = StreamEmitter(text_written=self.output_writen)
+
+        self.parent.run_vic()
+
+        self.parent.vic_running = False
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+
+    def output_writen(self, text):
+        cursor = self.parent.vic_run_console.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(text)
+        self.parent.vic_run_console.setTextCursor(cursor)
+        self.parent.vic_run_console.ensureCursorVisible()
+
+
+class StreamEmitter(QObject):
+        text_written = pyqtSignal(str)
+
+        def write(self, text):
+            self.text_written.emit(str(text))
