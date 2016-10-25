@@ -11,7 +11,7 @@ import logging
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from interfaces import GlobalConfig, VicRun, Routing
+from interfaces import GlobalConfig, VicRun, Routing, Calibrater
 
 from Hime import log
 from Hime.vic_proj import VicProj
@@ -49,6 +49,7 @@ class MainWindow(QMainWindow):
         self.global_config_panel = GlobalConfig(self)
         self.vic_run_panel = VicRun(self)
         self.routing_panel = Routing(self)
+        self.calibrate_panel = Calibrater(self)
 
         self.calib_layout = QVBoxLayout()
         self.rout_layout = QVBoxLayout()
@@ -63,7 +64,7 @@ class MainWindow(QMainWindow):
         tabs.addTab(self.global_config_panel, "Global setting")
         tabs.addTab(self.vic_run_panel, "Run VIC")
         tabs.addTab(self.routing_panel, "Routing")
-        tabs.addTab(self.make_tab(self.rout_layout), "Calibrate")
+        tabs.addTab(self.calibrate_panel, "Calibrate")
         tabs.addTab(self.make_tab(self.file_layout), "Input file create")
 
         self.log_console = QTextBrowser()

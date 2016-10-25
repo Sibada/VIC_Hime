@@ -970,3 +970,100 @@ class StreamEmitter(QObject):
 
         def write(self, text):
             self.text_written.emit(str(text))
+
+
+########################################################################################################################
+#
+# The second panel of main interface of VIC Hime.
+# Mainly to run VIC model.
+#
+########################################################################################################################
+class Calibrater(QWidget):
+    def __init__(self, parent=None):
+        super(Calibrater, self).__init__(parent)
+
+        self.param_file_le = QLineEdit()
+        self.param_file_btn = QPushButton("...")
+        self.param_file_btn.setFixedWidth(36)
+        self.calib_range_cb = QCheckBox("Use other calibrate range (default basin)")
+        self.calib_range_le = QLineEdit()
+        self.calib_range_btn = QPushButton("...")
+        self.calib_range_btn.setFixedWidth(36)
+        self.bpc_le = QLineEdit()
+        self.bpc_le.setFixedWidth(36)
+        self.only_bias_cb = QCheckBox("Objective function set only BIAS")
+
+        self.max_iterate_le = QLineEdit()
+        self.max_iterate_le.setFixedWidth(36)
+        self.toler_threshold_le = QLineEdit()
+        self.toler_threshold_le.setFixedWidth(36)
+
+        self.calib_param_table = QTableWidget()
+        self.calib_result_table = QTableWidget()
+
+        self.calib_param_table.setRowCount(6)
+        self.calib_param_table.setColumnCount(3)
+        self.calib_param_table.setHorizontalHeaderLabels(
+            ["x1", "x2", "x3"])
+        self.calib_param_table.setVerticalHeaderLabels(
+            ["Infilt", "Ds", "Dsm", "Ws", "d2", "d3"])
+        header = self.calib_param_table.horizontalHeader()
+        for i in range(3):
+            header.setResizeMode(i, QHeaderView.Stretch)
+
+        self.calib_result_table.setColumnCount(1)
+        self.calib_result_table.setRowCount(6)
+        self.calib_result_table.setVerticalHeaderLabels(
+            ["Infilt", "Ds", "Dsm", "Ws", "d2", "d3"])
+        self.calib_result_table.setHorizontalHeaderLabels(["Value"])
+        header = self.calib_result_table.horizontalHeader()
+        header.setResizeMode(0, QHeaderView.Stretch)
+
+
+        self.start_btn = QPushButton("&Calibrate start")
+        self.apply_configs_btn = QPushButton("&Apply configs")
+
+        self.run_console = QTextBrowser()
+
+        setting_group = QGroupBox()
+        setting_group.setStyleSheet(group_ss)
+        setting_group.setTitle("Calibrate configs")
+        setting_layout = QGridLayout()
+        setting_group.setLayout(setting_layout)
+        setting_layout.addWidget(QLabel("Parameters file:"), 0, 0, 1, 2)
+        setting_layout.addWidget(self.param_file_le, 0, 2, 1, 6)
+        setting_layout.addWidget(self.param_file_btn, 0, 8, 1, 1)
+        setting_layout.addWidget(QLabel("Calibrate range:"), 1, 0, 1, 2)
+        setting_layout.addWidget(self.calib_range_le, 1, 2, 1, 6)
+        setting_layout.addWidget(self.calib_range_btn, 1, 8, 1, 1)
+        setting_layout.addWidget(self.calib_range_cb, 2, 0, 1, 5)
+        setting_layout.addWidget(QLabel("Bias Propotion Coefficient:"), 3, 0, 1, 3)
+        setting_layout.addWidget(self.bpc_le, 3, 3, 1, 1)
+        setting_layout.addWidget(self.only_bias_cb, 4, 0, 1, 5)
+        setting_layout.addWidget(QLabel("Max iterations:"), 5, 0, 1, 2)
+        setting_layout.addWidget(self.max_iterate_le, 5, 2, 1, 1)
+        setting_layout.addWidget(QLabel("Toler threshold:"), 6, 0, 1, 2)
+        setting_layout.addWidget(self.toler_threshold_le, 6, 2, 1, 1)
+
+        setting_layout.addWidget(self.apply_configs_btn, 7, 2, 1, 2)
+        setting_layout.addWidget(self.start_btn, 7, 6, 1, 3)
+
+        calib_params_group = QGroupBox()
+        calib_params_group.setStyleSheet(group_ss)
+        calib_params_group.setTitle("Calibrate parameters")
+        calib_params_layout = QVBoxLayout()
+        calib_params_group.setLayout(calib_params_layout)
+        calib_params_layout.addWidget(QLabel("Initiate parameters:"))
+        calib_params_layout.addWidget(self.calib_param_table)
+        calib_params_layout.addStretch(1)
+        calib_params_layout.addWidget(QLabel("Calibrate results:"))
+        calib_params_layout.addWidget(self.calib_result_table)
+
+        up_layout = QHBoxLayout()
+        up_layout.addWidget(setting_group)
+        up_layout.addWidget(calib_params_group)
+
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(up_layout)
+        main_layout.addWidget(self.run_console)
+        self.setLayout(main_layout)
