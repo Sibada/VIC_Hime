@@ -1019,7 +1019,6 @@ class Calibrater(QWidget):
         header = self.calib_result_table.horizontalHeader()
         header.setResizeMode(0, QHeaderView.Stretch)
 
-
         self.start_btn = QPushButton("&Calibrate start")
         self.apply_configs_btn = QPushButton("&Apply configs")
 

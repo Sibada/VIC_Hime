@@ -38,15 +38,14 @@ import netCDF4 as nc
 # forcing_params is a dict or OrderedDict include those:
 #
 # {
-#   "variables": [{"path": "path", "var_name": "var_name", "type": "desc"}, ...],
-#   "coords_path": "coords_path",
+#   "variables": [{"data_path": "path", "coords_path": "path", "var_name": "var_name", "type": "desc"}, ...],
 #   "start_time": [year, month, day],
-#   "use_sh": ["sh_path", "temp_path", "vp_path", "sw_var_name", "lw_var_name"]
+#   "use_sh": ["sh_path", "temp_path", "vp_path", "sw_var_name", "lw_var_name"],
+#   "coords_path": "coords_path"
 # }
 # type must be one of those: TEMP, PREC, PRESS, SWDOWN, LWDOWN, VP, WIND
 def read_stn_data(forcing_params):
     variables = forcing_params["variables"]
-    coords_path = forcing_params["coords_path"]
     st_ymd = forcing_params["start_time"]
     start_time = dt.datetime(st_ymd[0], st_ymd[1], st_ymd[2])
     ed_ymd = forcing_params["end_time"]
@@ -56,8 +55,6 @@ def read_stn_data(forcing_params):
 
     # Read coordinates of stations.
     log.info("Reading station coordinates file %s" % coords_path)
-    coords = np.array(pd.read_table(coords_path, sep=r"[\s,;]", header=None))
-    stn_num = coords.shape[0]
 
     # ###################################################################################
     #
@@ -70,9 +67,11 @@ def read_stn_data(forcing_params):
     var_data = []
     for variable in variables:
         log.info("Reading %s" % variable["path"])
-        data = np.array(pd.read_table(variable["path"], sep=r"[\s,;]", header=None))
+        data = np.array(pd.read_table(variable["data_path"], sep=r"[\s,;]", header=None))
+        coords = np.array(pd.read_table(variable["coords_path"], sep=r"[\s,;]", header=None))
         new_var = OrderedDict({
             "data": data,
+            "coords": coords,
             "var_name": variable["var_name"],
             "type": variable["type"]
         })
@@ -98,6 +97,8 @@ def read_stn_data(forcing_params):
         lw_var_name = use_sh[4]
 
         # TODO: Check if those before is empty string.
+        coords_path = forcing_params["coords_path"]
+        coords = np.array(pd.read_table(coords_path, sep=r"[\s,;]", header=None))
         sh = np.array(pd.read_table(sh_path, sep=r"[\s,;]", header=None))
         temp = np.array(pd.read_table(temp_path, sep=r"[\s,;]", header=None))
         vp = np.array(pd.read_table(vp_path, sep=r"[\s,;]", header=None))
@@ -131,11 +132,13 @@ def read_stn_data(forcing_params):
 
         swdown_var = OrderedDict({
             "data": swdown,
+            "coords": coords,
             "var_name": sw_var_name,
             "type": "SWDOWN"
         })
         lwdown_var = OrderedDict({
             "data": lwdown,
+            "coords": coords,
             "var_name": lw_var_name,
             "type": "LWDOWN"
         })
@@ -143,13 +146,13 @@ def read_stn_data(forcing_params):
         var_data.append(lwdown_var)
 
     forcing_data = OrderedDict()
-    forcing_data["coords"] = coords
     forcing_data["variables"] = var_data
     forcing_data["start_time"] = start_time
     forcing_data["end_time"] = end_time
     forcing_data["freq"] = freq
 
     return forcing_data
+
 
 ########################################################################################################################
 #
@@ -166,11 +169,9 @@ def read_stn_data(forcing_params):
 #   "krige_params": ["vgm_model"]
 # }
 def create_forcing(forcing_data, create_params):
-    coords = forcing_data["coords"]
     start_time = forcing_data["start_time"]
     end_time = forcing_data["end_time"]
     freq = forcing_data["freq"]
-    data_length = forcing_data["variables"][0]["data"].shape[0]
 
     ts = pd.date_range(start_time, end=end_time, freq=freq)
 
@@ -258,6 +259,7 @@ def create_forcing(forcing_data, create_params):
         for variable in forcing_data["variables"]:
             var_name = variable["var_name"]
             data = variable["data"]
+            coords = variable["coords"]
             var_type = variable["type"]
             v = ff.createVariable(var_name, "f8", ("time", "lat", "lon"), fill_value=-9999)
 
