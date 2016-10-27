@@ -53,9 +53,6 @@ def read_stn_data(forcing_params):
     freq = forcing_params["freq"]
     use_sh = forcing_params["use_sh"]
 
-    # Read coordinates of stations.
-    log.info("Reading station coordinates file %s" % coords_path)
-
     # ###################################################################################
     #
     # Read atmospheric data.

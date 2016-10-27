@@ -685,8 +685,8 @@ class VicRun(QWidget):
 
 ########################################################################################################################
 #
-# The second panel of main interface of VIC Hime.
-# Mainly to run VIC model.
+# The third panel of main interface of VIC Hime.
+# Mainly to run Routing model for VIC.
 #
 ########################################################################################################################
 class Routing(QWidget):
@@ -834,6 +834,11 @@ class Routing(QWidget):
         self.connect(self.apply_configs_btn, SIGNAL("clicked()"), self.apply_configs)
         self.connect(self.routing_btn, SIGNAL("clicked()"), self.routing)
 
+        #######################################################################
+        # Business part
+        #######################################################################
+        self.configs = None
+
     def set_file_by_dialog(self, line_edit, disc):
         file = QFileDialog.getOpenFileName(self, disc)
         log.debug("Open file: %s" % file)
@@ -884,7 +889,7 @@ class Routing(QWidget):
             self.configs["rout_data_file"] = "None"
             self.configs["rout_output_dir"] = "None"
             self.configs["start_date"] = [1960, 1, 1]
-            self.configs["start_date"] = [1970, 12, 31]
+            self.configs["end_date"] = [1970, 12, 31]
 
         else:
             self.configs = self.parent.proj.proj_params["routing_config"]
@@ -894,8 +899,8 @@ class Routing(QWidget):
         self.diffu_file_le.setText(self.configs["diffu_file"])
         self.uh_slope_data_le.setText(self.configs["uh_slope"])
         self.stn_name_le.setText(self.configs["station_name"])
-        self.stn_x_le.setText(self.configs["station_row"])
-        self.stn_y_le.setText(self.configs["station_col"])
+        self.stn_x_le.setText(unicode(self.configs["station_row"]))
+        self.stn_y_le.setText(unicode(self.configs["station_col"]))
         self.out_rout_data_le.setText(self.configs["out_rout_data"])
 
         self.vic_out_file_le.setText(self.configs["vic_out_file"])
@@ -974,8 +979,8 @@ class StreamEmitter(QObject):
 
 ########################################################################################################################
 #
-# The second panel of main interface of VIC Hime.
-# Mainly to run VIC model.
+# The forth panel of main interface of VIC Hime.
+# Mainly for auto calibrate of VIC.
 #
 ########################################################################################################################
 class Calibrater(QWidget):
@@ -1065,4 +1070,149 @@ class Calibrater(QWidget):
         main_layout = QVBoxLayout()
         main_layout.addLayout(up_layout)
         main_layout.addWidget(self.run_console)
+        self.setLayout(main_layout)
+
+
+########################################################################################################################
+#
+# The fifth panel of main interface of VIC Hime.
+# Mainly to run VIC model.
+#
+########################################################################################################################
+class FileCreater(QWidget):
+    def __init__(self, parent=None):
+        super(FileCreater, self).__init__(parent)
+
+        #######################################################################
+        # Forcing file create group
+        #######################################################################
+        self.forcing_var_table = QTableWidget()
+        self.add_item_btn = QPushButton("Add item")
+        self.remove_item_btn = QPushButton("Remove item")
+
+        self.forc_prefix_le = QLineEdit()
+        self.forc_out_path_le = QLineEdit()
+        self.forc_out_path_btn = QPushButton("...")
+        self.forc_out_path_btn.setFixedWidth(36)
+        self.start_time_de = QDateTimeEdit()
+        self.start_time_de.setDisplayFormat("yyyy-MM-dd")
+        self.end_time_de = QDateTimeEdit()
+        self.end_time_de.setDisplayFormat("yyyy-MM-dd")
+
+        self.use_sh_cb = QCheckBox("Use sunshine hours data")
+        self.sh_coords_le = QLineEdit()
+        self.sh_coords_btn = QPushButton("...")
+        self.sh_coords_btn.setFixedWidth(36)
+        self.sh_data_le = QLineEdit()
+        self.sh_data_btn = QPushButton("...")
+        self.sh_data_btn.setFixedWidth(36)
+
+        self.temp_data_le = QLineEdit()
+        self.temp_data_btn = QPushButton("...")
+        self.temp_data_btn.setFixedWidth(36)
+        self.vp_data_le = QLineEdit()
+        self.vp_data_btn = QPushButton("...")
+        self.vp_data_btn.setFixedWidth(36)
+
+        self.forcing_start_btn = QPushButton("Start creating")
+        self.apply_configs_btn = QPushButton("Apply configs")
+
+        self.forcing_var_table.setColumnCount(4)
+        self.forcing_var_table.setMinimumHeight(96)
+        self.forcing_var_table.setHorizontalHeaderLabels([
+            "Data path", "Coordinates path", "Variable name", "Type"])
+        forcing_header = self.forcing_var_table.horizontalHeader()
+        [forcing_header.setResizeMode(i, QHeaderView.Stretch) for i in range(3)]
+        forcing_header.setResizeMode(3, QHeaderView.Stretch)
+
+        forcing_group = QGroupBox()
+        forcing_group.setStyleSheet(group_ss)
+        forcing_group.setTitle("Create forcing file")
+        forcing_layout = QGridLayout()
+        forcing_group.setLayout(forcing_layout)
+
+        forcing_layout.addWidget(self.forcing_var_table, 0, 0, 6, 8)
+        forcing_layout.addWidget(self.add_item_btn, 6, 0, 1, 2)
+        forcing_layout.addWidget(self.remove_item_btn, 6, 4, 1, 2)
+
+        forcing_layout.addWidget(QLabel("Forcing file prefix:"), 7, 0, 1, 2)
+        forcing_layout.addWidget(self.forc_prefix_le, 7, 2, 1, 2)
+
+        forcing_layout.addWidget(QLabel("Forcing file output path:"), 8, 0, 1, 2)
+        forcing_layout.addWidget(self.forc_out_path_le, 8, 2, 1, 4)
+        forcing_layout.addWidget(self.forc_out_path_btn, 8, 6, 1, 1)
+
+        forcing_layout.addWidget(QLabel("Start time:"), 9, 0, 1, 1)
+        forcing_layout.addWidget(self.start_time_de, 9, 1, 1, 2)
+        forcing_layout.addWidget(QLabel("End time:"), 9, 5, 1, 1)
+        forcing_layout.addWidget(self.end_time_de, 9, 6, 1, 2)
+
+        forcing_layout.addWidget(self.use_sh_cb, 10, 0, 1, 4)
+        forcing_layout.addWidget(QLabel("Station coordinates file:"), 11, 0, 1, 2)
+        forcing_layout.addWidget(self.sh_coords_le, 11, 2, 1, 4)
+        forcing_layout.addWidget(self.sh_coords_btn, 11, 6, 1, 1)
+        forcing_layout.addWidget(QLabel("Sunshine hours data file:"), 12, 0, 1, 2)
+        forcing_layout.addWidget(self.sh_data_le, 12, 2, 1, 4)
+        forcing_layout.addWidget(self.sh_data_btn, 12, 6, 1, 1)
+        forcing_layout.addWidget(QLabel("Temperature data file:"), 13, 0, 1, 2)
+        forcing_layout.addWidget(self.temp_data_le, 13, 2, 1, 4)
+        forcing_layout.addWidget(self.temp_data_btn, 13, 6, 1, 1)
+        forcing_layout.addWidget(QLabel("VP data file:"), 14, 0, 1, 2)
+        forcing_layout.addWidget(self.vp_data_le, 14, 2, 1, 4)
+        forcing_layout.addWidget(self.vp_data_btn, 14, 6, 1, 1)
+
+        forcing_layout.addWidget(self.apply_configs_btn, 15, 3, 1, 2)
+        forcing_layout.addWidget(self.forcing_start_btn, 15, 6, 1, 2)
+
+
+        #######################################################################
+        # Parameters file create group
+        #######################################################################
+        self.soil_file_le = QLineEdit()
+        self.soil_file_btn = QPushButton("...")
+        self.soil_file_btn.setFixedWidth(36)
+
+        self.veg_params_le = QLineEdit()
+        self.veg_params_btn = QPushButton("...")
+        self.veg_params_btn.setFixedWidth(36)
+
+        self.veg_lib_le = QLineEdit()
+        self.veg_lib_btn = QPushButton("...")
+        self.veg_lib_btn.setFixedWidth(36)
+
+        self.params_out_path_le = QLineEdit()
+        self.params_out_path_btn = QPushButton("...")
+        self.params_out_path_btn.setFixedWidth(36)
+
+        self.params_create_btn = QPushButton("Create parameters file")
+
+        params_group = QGroupBox()
+        params_layout = QGridLayout()
+        params_group.setLayout(params_layout)
+        params_group.setStyleSheet(group_ss)
+        params_group.setTitle("Create parameters file")
+
+        params_layout.addWidget(QLabel("Station coordinates file:"), 0, 0, 1, 2)
+        params_layout.addWidget(self.soil_file_le, 0, 2, 1, 4)
+        params_layout.addWidget(self.soil_file_btn, 0, 6, 1, 1)
+
+        params_layout.addWidget(QLabel("Station coordinates file:"), 1, 0, 1, 2)
+        params_layout.addWidget(self.veg_params_le, 1, 2, 1, 4)
+        params_layout.addWidget(self.veg_params_btn, 1, 6, 1, 1)
+
+        params_layout.addWidget(QLabel("Station coordinates file:"), 2, 0, 1, 2)
+        params_layout.addWidget(self.veg_lib_le, 2, 2, 1, 4)
+        params_layout.addWidget(self.veg_lib_btn, 2, 6, 1, 1)
+
+        params_layout.addWidget(QLabel("Station coordinates file:"), 3, 0, 1, 2)
+        params_layout.addWidget(self.params_out_path_le, 3, 2, 1, 4)
+        params_layout.addWidget(self.params_out_path_btn, 3, 6, 1, 1)
+
+        params_layout.addWidget(self.params_create_btn, 4, 5, 1, 2)
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(forcing_group)
+        main_layout.addStretch(1)
+        main_layout.addWidget(params_group)
+
         self.setLayout(main_layout)

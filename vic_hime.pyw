@@ -11,7 +11,7 @@ import logging
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from interfaces import GlobalConfig, VicRun, Routing, Calibrater
+from interfaces import GlobalConfig, VicRun, Routing, Calibrater, FileCreater
 
 from Hime import log
 from Hime.vic_proj import VicProj
@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
         self.vic_run_panel = VicRun(self)
         self.routing_panel = Routing(self)
         self.calibrate_panel = Calibrater(self)
+        self.file_create_panel = FileCreater(self)
 
         self.calib_layout = QVBoxLayout()
         self.rout_layout = QVBoxLayout()
@@ -60,12 +61,12 @@ class MainWindow(QMainWindow):
         # Set main interface.
         #######################################################################
         tabs = QTabWidget()
-        tabs.setMinimumSize(600, 640)
+        tabs.setMinimumSize(600, 680)
         tabs.addTab(self.global_config_panel, "Global setting")
         tabs.addTab(self.vic_run_panel, "Run VIC")
         tabs.addTab(self.routing_panel, "Routing")
         tabs.addTab(self.calibrate_panel, "Calibrate")
-        tabs.addTab(self.make_tab(self.file_layout), "Input file create")
+        tabs.addTab(self.file_create_panel, "Input file create")
 
         self.log_console = QTextBrowser()
         self.log_console.setMinimumWidth(300)
@@ -169,6 +170,7 @@ class MainWindow(QMainWindow):
 
                 self.global_config_panel.load_configs()
                 self.vic_run_panel.load_configs()
+                self.routing_panel.load_configs()
 
     def open_proj(self):
         proj_file = QFileDialog.getOpenFileName(self, "Select project file.",
@@ -181,6 +183,7 @@ class MainWindow(QMainWindow):
 
         self.global_config_panel.load_configs()
         self.vic_run_panel.load_configs()
+        self.routing_panel.load_configs()
 
     def save_proj(self):
         if self.proj is None:
