@@ -201,7 +201,7 @@ class GlobalConfig(QWidget):
         self.output_table.setMinimumWidth(192)
         self.output_table.setColumnCount(4)
         output_header = self.output_table.horizontalHeader()
-        for i in range(4):
+        for i in range(7):
             output_header.setResizeMode(i, QHeaderView.ResizeToContents)
         self.output_table.setHorizontalHeaderLabels(["Out file", "Out variable", "Out format", "Agg freq"])
 
@@ -1097,12 +1097,12 @@ class Calibrater(QWidget):
 ########################################################################################################################
 #
 # The fifth panel of main interface of VIC Hime.
-# Mainly to run VIC model.
+# Mainly to create forcing files.
 #
 ########################################################################################################################
-class FileCreater(QWidget):
+class ForcingCreater(QWidget):
     def __init__(self, parent=None):
-        super(FileCreater, self).__init__(parent)
+        super(ForcingCreater, self).__init__(parent)
         self.parent = parent
 
         #######################################################################
@@ -1140,12 +1140,12 @@ class FileCreater(QWidget):
         self.vp_data_btn.setFixedWidth(36)
 
         self.forcing_start_btn = QPushButton("Start creating")
-        self.apply_configs_btn = QPushButton("Apply configs")
+        self.apply_configs_btn = QPushButton("&Apply configs")
 
-        self.forcing_var_table.setColumnCount(4)
+        self.forcing_var_table.setColumnCount(7)
         self.forcing_var_table.setMinimumHeight(96)
         self.forcing_var_table.setHorizontalHeaderLabels([
-            "Data path", "Coordinates path", "Variable name", "Type"])
+            "Data path", "Coordinates path", "Variable name", "Type", "ITP p1", "ITP p2", "ITP p3"])
         forcing_header = self.forcing_var_table.horizontalHeader()
         [forcing_header.setResizeMode(i, QHeaderView.Stretch) for i in range(3)]
         forcing_header.setResizeMode(3, QHeaderView.Stretch)
@@ -1194,54 +1194,27 @@ class FileCreater(QWidget):
         forcing_layout.addWidget(self.forcing_start_btn, 15, 6, 1, 2)
 
         #######################################################################
-        # Parameters file create group
+        # Interpolation settings.
         #######################################################################
-        self.soil_file_le = QLineEdit()
-        self.soil_file_btn = QPushButton("...")
-        self.soil_file_btn.setFixedWidth(36)
+        self.idw_rb = QRadioButton("Use IDW")
+        self.idw_rb.setChecked(True)
 
-        self.veg_params_le = QLineEdit()
-        self.veg_params_btn = QPushButton("...")
-        self.veg_params_btn.setFixedWidth(36)
+        self.krige_rb = QRadioButton("Use Krige (Still unavailable...)")
+        # Todo Varivy krige.
 
-        self.veg_lib_le = QLineEdit()
-        self.veg_lib_btn = QPushButton("...")
-        self.veg_lib_btn.setFixedWidth(36)
+        itp_group = QGroupBox()
+        itp_group.setStyleSheet(group_ss)
+        itp_group.setTitle("Interpolation configs")
+        itp_layout = QGridLayout()
+        itp_group.setLayout(itp_layout)
 
-        self.params_out_path_le = QLineEdit()
-        self.params_out_path_btn = QPushButton("...")
-        self.params_out_path_btn.setFixedWidth(36)
-
-        self.params_create_btn = QPushButton("Create parameters file")
-
-        params_group = QGroupBox()
-        params_layout = QGridLayout()
-        params_group.setLayout(params_layout)
-        params_group.setStyleSheet(group_ss)
-        params_group.setTitle("Create parameters file")
-
-        params_layout.addWidget(QLabel("Soil parameters file:"), 0, 0)
-        params_layout.addWidget(self.soil_file_le, 0, 1, 1, 2)
-        params_layout.addWidget(self.soil_file_btn, 0, 3, 1, 1)
-
-        params_layout.addWidget(QLabel("Veg parameters file:"), 0, 4)
-        params_layout.addWidget(self.veg_params_le, 0, 5, 1, 2)
-        params_layout.addWidget(self.veg_params_btn, 0, 7)
-
-        params_layout.addWidget(QLabel("Veg lib file:"), 1, 0)
-        params_layout.addWidget(self.veg_lib_le, 1, 1, 1, 2)
-        params_layout.addWidget(self.veg_lib_btn, 1, 3, 1, 1)
-
-        params_layout.addWidget(QLabel("Output path:"), 1, 4)
-        params_layout.addWidget(self.params_out_path_le, 1, 5, 1, 2)
-        params_layout.addWidget(self.params_out_path_btn, 1, 7)
-
-        params_layout.addWidget(self.params_create_btn, 2, 5, 1, 3)
+        itp_layout.addWidget(self.idw_rb, 0, 0)
+        itp_layout.addWidget(self.krige_rb, 2, 0)
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(forcing_group)
         main_layout.addStretch(1)
-        main_layout.addWidget(params_group)
+        main_layout.addWidget(itp_group)
 
         self.setLayout(main_layout)
 
@@ -1261,28 +1234,19 @@ class FileCreater(QWidget):
         self.connect(self.vp_data_btn, SIGNAL("clicked()"),
                      lambda: self.set_file_by_dialog(line_edit=self.vp_data_le, disc="Set vapor pressure file"))
 
-        self.connect(self.soil_file_btn, SIGNAL("clicked()"),
-                     lambda: self.set_file_by_dialog(line_edit=self.soil_file_le, disc="Set soil file"))
-        self.connect(self.veg_params_btn, SIGNAL("clicked()"),
-                     lambda: self.set_file_by_dialog(line_edit=self.veg_params_le, disc="Set veg params file"))
-        self.connect(self.veg_lib_btn, SIGNAL("clicked()"),
-                     lambda: self.set_file_by_dialog(line_edit=self.veg_lib_le, disc="Set veg lib file"))
-        self.connect(self.params_out_path_btn, SIGNAL("clicked()"),
-                     lambda: self.set_dir_by_dialog(line_edit=self.params_out_path_le, disc="Set parameters files output path"))
-
         self.connect(self.apply_configs_btn, SIGNAL("clicked()"), self.apply_configs)
 
         self.connect(self.add_item_btn, SIGNAL("clicked()"), lambda: self.add_item(table=self.forcing_var_table))
         self.connect(self.remove_item_btn, SIGNAL("clicked()"), lambda: self.remove_item(table=self.forcing_var_table))
 
         self.connect(self.forcing_start_btn, SIGNAL("clicked()"), self.start_forcing_create)
-        self.connect(self.params_create_btn, SIGNAL("clicked()"), self.start_params_create)
+
 
         #######################################################################
         # Business part.
         #######################################################################
         self.configs = None
-        self.file_create_thread = FileCreateThread(self)
+        self.file_create_thread = ForcingCreateThread(self)
         self.create_forcing = True
 
     def set_file_by_dialog(self, line_edit, disc):
@@ -1305,8 +1269,10 @@ class FileCreater(QWidget):
             self.configs["forc_prefix"] = "forcing."
 
             proj_path = self.parent.proj.proj_params["proj_path"]
-            self.configs["forc_out_path"] = proj_path
-            self.configs["domain_file"] = proj_path + "/domain.nc"
+            if proj_path[-1] != "/":
+                proj_path += "/"
+            self.configs["forc_out_path"] = proj_path + "data"
+            self.configs["domain_file"] = proj_path + "domain.nc"
             self.configs["start_time"] = [1960, 1, 1]
             self.configs["end_time"] = [1970, 12, 31]
 
@@ -1317,12 +1283,9 @@ class FileCreater(QWidget):
             self.configs["temp_data"] = proj_path + "/temp_data.txt"
             self.configs["vp_data"] = proj_path + "/vp_data.txt"
 
-            self.configs["soil"] = proj_path + "/soil_params.txt"
-            self.configs["veg"] = proj_path + "/veg_params.txt"
-            self.configs["veg_lib"] = proj_path + "/veg_lib.txt"
-            self.configs["out_path"] = proj_path
-
             self.configs["forcing_vars"] = []
+
+            self.configs["itp_method"] = 0
         else:
             self.configs = self.parent.proj.proj_params.get("file_create_configs")
 
@@ -1345,16 +1308,16 @@ class FileCreater(QWidget):
         self.temp_data_le.setText(self.configs["temp_data"])
         self.vp_data_le.setText(self.configs["vp_data"])
 
-        self.soil_file_le.setText(self.configs["soil"])
-        self.veg_params_le.setText(self.configs["veg"])
-        self.veg_lib_le.setText(self.configs["veg_lib"])
-        self.params_out_path_le.setText(self.configs["out_path"])
-
         forcing_vars = self.configs["forcing_vars"]
         self.forcing_var_table.setRowCount(len(forcing_vars))
         for i in range(len(forcing_vars)):
-            for j in range(4):
+            for j in range(7):
                 self.forcing_var_table.setItem(i, j, QTableWidgetItem(forcing_vars[i][j]))
+
+        if self.configs["itp_method"] == 0:
+            self.idw_rb.setChecked(True)
+        else:
+            self.krige_rb.setChecked(True)
 
     def apply_configs(self):
         self.configs["forc_prefix"] = unicode(self.forc_prefix_le.text())
@@ -1370,18 +1333,18 @@ class FileCreater(QWidget):
         self.configs["temp_data"] = unicode(self.temp_data_le.text())
         self.configs["vp_data"] = unicode(self.vp_data_le.text())
 
-        self.configs["soil"] = unicode(self.soil_file_le.text())
-        self.configs["veg"] = unicode(self.veg_params_le.text())
-        self.configs["veg_lib"] = unicode(self.veg_lib_le.text())
-        self.configs["out_path"] = unicode(self.params_out_path_le.text())
-
         vars = []
         for i in range(self.forcing_var_table.rowCount()):
             var = []
-            for j in range(4):
+            for j in range(7):
                 var.append(unicode(self.forcing_var_table.item(i, j).text()))
             vars.append(var)
         self.configs["forcing_vars"] = vars
+
+        if self.idw_rb.isChecked():
+            self.configs["itp_method"] = 0
+        else:
+            self.configs["itp_method"] = 1
 
         self.parent.proj.proj_params["file_create_configs"] = self.configs
         self.parent.dirty = True
@@ -1391,9 +1354,12 @@ class FileCreater(QWidget):
         nrow_o = table.rowCount()
         table.setRowCount(nrow_o + 1)
         if nrow_o < 1:
-            return
-        for i in range(table.columnCount()):
-            table.setItem(nrow_o, i, QTableWidgetItem(table.item(nrow_o-1, i)))
+            table.setItem(nrow_o, 4, QTableWidgetItem(QString("2.0")))
+            table.setItem(nrow_o, 5, QTableWidgetItem(QString("6.0")))
+            table.setItem(nrow_o, 6, QTableWidgetItem(QString("6.0")))
+        else:
+            for i in range(table.columnCount()):
+                table.setItem(nrow_o, i, QTableWidgetItem(table.item(nrow_o-1, i)))
 
     def remove_item(self, table):
         rs = [ind.row() for ind in table.selectedIndexes()]
@@ -1411,7 +1377,10 @@ class FileCreater(QWidget):
                 "data_path": unicode(self.forcing_var_table.item(r, 0).text()),
                 "coords_path": unicode(self.forcing_var_table.item(r, 1).text()),
                 "var_name": unicode(self.forcing_var_table.item(r, 2).text()),
-                "type": unicode(self.forcing_var_table.item(r, 3).text())
+                "type": unicode(self.forcing_var_table.item(r, 3).text()),
+                "itp_params": [float(unicode(self.forcing_var_table.item(r, 4).text())),
+                               float(unicode(self.forcing_var_table.item(r, 5).text())),
+                               float(unicode(self.forcing_var_table.item(r, 6).text()))]
             }
             variables.append(var)
         forcing_params["variables"] = variables
@@ -1440,54 +1409,257 @@ class FileCreater(QWidget):
         forc_path += unicode(self.forc_prefix_le.text())
         create_params["forcing_path"] = forc_path
         create_params["domain_file"] = unicode(self.domain_file_le.text())
+
         create_params["idw_params"] = [2, 6, 6]
         create_params["krige_params"] = ["exp"]
 
         return create_params
 
     def create_forcing_file(self):
-        os.makedirs(unicode(self.forc_out_path_le.text()))
+        try:
+            os.makedirs(unicode(self.forc_out_path_le.text()))
+        except Exception:
+            log.warn(unicode(self.forc_out_path_le.text()) + " exist.")
         forcing_params = self.create_forcing_params()
         forcing_data = read_stn_data(forcing_params)
 
         create_params = self.create_create_params()
         create_forcing(forcing_data, create_params)
-# creater_params = {
-#     "soil_file": "/home/victi/TRMM_VIC/params/soil/soil.txt",
-#     "fract_file": None,
-#     "snow_band": 1,
-#     "n_layer": 3,
-#     "organic": False,
-#     "compute_treeline": False,
+
+    def start_forcing_create(self):
+        self.create_forcing = True
+        self.file_create_thread.start()
+
+
+class ForcingCreateThread(QThread):
+    def __init__(self, parent=None):
+        super(ForcingCreateThread, self).__init__(parent)
+        self.parent = parent
+
+    def run(self):
+        if self.parent.create_forcing:
+            self.parent.create_forcing_file()
+        else:
+            self.parent.create_parameters_file()
+
+
+########################################################################################################################
 #
-#     "veg_file": "/home/victi/TRMM_VIC/params/veg_param.txt",
-#     "n_rootzones": 3,
+# The sixth panel of main interface of VIC Hime.
+# Mainly to create parameters file.
 #
-#     "veg_lib_file": "/home/victi/TRMM_VIC/params/veglib.LDAS",
-#     "veg_class": 12,
-#     "veglib_vegcover": False,
-#
-#     "dec": 6,
-#     "params_file": "/home/victi/TRMM_VIC/SC/params.nc",
-#     "domain_file": "/home/victi/TRMM_VIC/SC/domain.nc"
-# }
+########################################################################################################################
+class ParamsCreater(QWidget):
+    def __init__(self, parent=None):
+        super(ParamsCreater, self).__init__(parent)
+        self.parent = parent
+
+        #######################################################################
+        # Parameters file create group
+        #######################################################################
+        self.soil_file_le = QLineEdit()
+        self.soil_file_btn = QPushButton("...")
+        self.soil_file_btn.setFixedWidth(36)
+
+        self.veg_params_le = QLineEdit()
+        self.veg_params_btn = QPushButton("...")
+        self.veg_params_btn.setFixedWidth(36)
+
+        self.veg_lib_le = QLineEdit()
+        self.veg_lib_btn = QPushButton("...")
+        self.veg_lib_btn.setFixedWidth(36)
+
+        self.params_out_path_le = QLineEdit()
+        self.params_out_path_btn = QPushButton("...")
+        self.params_out_path_btn.setFixedWidth(36)
+
+        self.fract_file_le = QLineEdit()
+        self.fract_file_btn = QPushButton("...")
+        self.fract_file_btn.setFixedWidth(36)
+
+        self.snow_bands_le = QLineEdit()
+        self.snow_bands_le.setFixedWidth(48)
+        self.layers_le = QLineEdit()
+        self.layers_le.setFixedWidth(48)
+        self.rootzones_le = QLineEdit()
+        self.rootzones_le.setFixedWidth(48)
+        self.veg_class_le = QLineEdit()
+        self.veg_class_le.setFixedWidth(48)
+        self.dec_le = QLineEdit()
+        self.dec_le.setFixedWidth(48)
+
+        self.organic_cb = QCheckBox("Organic")
+        self.treeline_cb = QCheckBox("Compute treeline")
+        self.vegcover_cb = QCheckBox("Veg cover")
+
+        self.apply_configs_btn = QPushButton("&Apply configs")
+        self.params_create_btn = QPushButton("Create parameters file")
+
+        params_group = QGroupBox()
+        params_layout = QGridLayout()
+        params_group.setLayout(params_layout)
+        params_group.setStyleSheet(group_ss)
+        params_group.setTitle("Create parameters file")
+
+        params_layout.addWidget(QLabel("Soil parameters file:"), 0, 0, 1, 2)
+        params_layout.addWidget(self.soil_file_le, 0, 2, 1, 4)
+        params_layout.addWidget(self.soil_file_btn, 0, 6, 1, 1)
+
+        params_layout.addWidget(QLabel("Veg parameters file:"), 1, 0, 1, 2)
+        params_layout.addWidget(self.veg_params_le, 1, 2, 1, 4)
+        params_layout.addWidget(self.veg_params_btn, 1, 6)
+
+        params_layout.addWidget(QLabel("Veg lib file:"), 2, 0, 1, 2)
+        params_layout.addWidget(self.veg_lib_le, 2, 2, 1, 4)
+        params_layout.addWidget(self.veg_lib_btn, 2, 6, 1, 1)
+
+        params_layout.addWidget(QLabel("Output path:"), 3, 0, 1, 2)
+        params_layout.addWidget(self.params_out_path_le, 3, 2, 1, 4)
+        params_layout.addWidget(self.params_out_path_btn, 3, 6)
+
+        params_layout.addWidget(QLabel("Fraction file:"), 4, 0, 1, 2)
+        params_layout.addWidget(self.fract_file_le, 4, 2, 1, 4)
+        params_layout.addWidget(self.fract_file_btn, 4, 6)
+
+        params_layout.addWidget(QLabel("Layers:"), 5, 0)
+        params_layout.addWidget(self.layers_le, 5, 1)
+
+        params_layout.addWidget(QLabel("Snow bands:"), 5, 2)
+        params_layout.addWidget(self.snow_bands_le, 5, 3)
+
+        params_layout.addWidget(QLabel("Rootzones:"), 6, 0)
+        params_layout.addWidget(self.rootzones_le, 6, 1)
+
+        params_layout.addWidget(QLabel("Veg class:"), 6, 2)
+        params_layout.addWidget(self.veg_class_le, 6, 3)
+
+        params_layout.addWidget(QLabel("Dec:"), 6, 4)
+        params_layout.addWidget(self.dec_le, 6, 5)
+
+        params_layout.addWidget(self.organic_cb, 7, 0)
+        params_layout.addWidget(self.treeline_cb, 7, 1)
+        params_layout.addWidget(self.vegcover_cb, 7, 2)
+        params_layout.addWidget(self.apply_configs_btn, 8, 4, 1, 1)
+        params_layout.addWidget(self.params_create_btn, 8, 5, 1, 2)
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(params_group)
+        main_layout.addStretch(1)
+
+        self.setLayout(main_layout)
+
+        self.connect(self.soil_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.soil_file_le, disc="Set soil file"))
+        self.connect(self.veg_params_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.veg_params_le, disc="Set veg params file"))
+        self.connect(self.veg_lib_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.veg_lib_le, disc="Set veg lib file"))
+        self.connect(self.params_out_path_btn, SIGNAL("clicked()"),
+                     lambda: self.set_dir_by_dialog(line_edit=self.params_out_path_le, disc="Set parameters files output path"))
+
+        self.connect(self.apply_configs_btn, SIGNAL("clicked()"), self.apply_configs)
+        self.connect(self.params_create_btn, SIGNAL("clicked()"), self.start_params_create)
+
+        #######################################################################
+        # Business part.
+        #######################################################################
+        self.create_thread = ParamsCreateThread(self)
+
+    def set_file_by_dialog(self, line_edit, disc):
+        file = QFileDialog.getOpenFileName(self, disc)
+        log.debug("Get file: %s" % file)
+        if file == "":
+            return
+        line_edit.setText(file)
+
+    def set_dir_by_dialog(self, line_edit, disc):
+        dir = QFileDialog.getExistingDirectory(self, disc)
+        log.debug("Get dir: %s" % dir)
+        if dir == "":
+            return
+        line_edit.setText(dir)
+
+    def load_configs(self):
+        if self.parent.proj.proj_params.get("params_configs") is None:
+            self.configs = OrderedDict()
+
+            proj_path = self.parent.proj.proj_params["proj_path"]
+            self.configs["soil"] = proj_path + "/soil_params.txt"
+            self.configs["veg"] = proj_path + "/veg_params.txt"
+            self.configs["veg_lib"] = proj_path + "/veg_lib.LDAS"
+            self.configs["out_path"] = proj_path
+
+            self.configs["organic"] = False
+            self.configs["treeline"] = False
+            self.configs["vegcover"] = False
+        else:
+            self.configs = self.parent.proj.proj_params.get("params_configs")
+
+        self.soil_file_le.setText(self.configs["soil"])
+        self.veg_params_le.setText(self.configs["veg"])
+        self.veg_lib_le.setText(self.configs["veg_lib"])
+        self.params_out_path_le.setText(self.configs["out_path"])
+        self.fract_file_le.setText(self.configs["fract"])
+
+        self.layers_le.setText(self.configs["layers"])
+        self.snow_bands_le.setText(self.configs["snow_bands"])
+        self.rootzones_le.setText(self.configs["rootzones"])
+        self.veg_class_le.setText(self.configs["veg_class"])
+        self.dec_le.setText(self.configs["dev"])
+
+        if self.configs["organic"]:
+            self.organic_cb.setChecked(Qt.Checked)
+        else:
+            self.organic_cb.setChecked(Qt.Unchecked)
+
+        if self.configs["treeline"]:
+            self.treeline_cb.setChecked(Qt.Checked)
+        else:
+            self.treeline_cb.setChecked(Qt.Unchecked)
+
+        if self.configs["vegcover"]:
+            self.vegcover_cb.setChecked(Qt.Checked)
+        else:
+            self.vegcover_cb.setChecked(Qt.Unchecked)
+
+    def apply_configs(self):
+        self.configs["soil"] = unicode(self.soil_file_le.text())
+        self.configs["veg"] = unicode(self.veg_params_le.text())
+        self.configs["veg_lib"] = unicode(self.veg_lib_le.text())
+        self.configs["out_path"] = unicode(self.params_out_path_le.text())
+        self.configs["fract"] = unicode(self.fract_file_le.text())
+
+        self.configs["layers"] = unicode(self.layers_le.text())
+        self.configs["snow_bands"] = unicode(self.snow_bands_le.text())
+        self.configs["rootzones"] = unicode(self.rootzones_le.text())
+        self.configs["veg_class"] = unicode(self.veg_class_le.text())
+        self.configs["dev"] = unicode(self.dec_le.text())
+
+        self.configs["organic"] = True if self.organic_cb.isChecked() else False
+        self.configs["treeline"] = True if self.treeline_cb.isChecked() else False
+        self.configs["vegcover"] = True if self.vegcover_cb.isChecked() else False
+
+        self.parent.proj.proj_params["params_configs"] = self.configs
+        self.parent.dirty = True
+        log.info("Configs has been applied.")
+
     def create_parameters_file(self):
         creater_params = OrderedDict()
         creater_params["soil_file"] = unicode(self.soil_file_le.text())
         creater_params["fract_file"] = None
-        creater_params["snow_band"] = 1
-        creater_params["n_layer"] = 3
+        creater_params["snow_band"] = int(unicode(self.snow_bands_le.text()))
+        creater_params["n_layer"] = int(unicode(self.layers_le.text()))
         creater_params["organic"] = False
         creater_params["compute_treeline"] = False
 
         creater_params["veg_file"] = unicode(self.veg_params_le.text())
-        creater_params["n_rootzones"] = 3
+        creater_params["n_rootzones"] = int(unicode(self.rootzones_le.text()))
 
         creater_params["veg_lib_file"] = unicode(self.veg_lib_le.text())
-        creater_params["veg_class"] = 12
+        creater_params["veg_class"] = int(unicode(self.veg_class_le.text()))
         creater_params["veglib_vegcover"] = False
 
-        creater_params["dec"] = 6
+        creater_params["dec"] = int(unicode(self.dec_le.text()))
 
         out_path = unicode(self.params_out_path_le.text())
         if out_path[-1] != "/":
@@ -1497,21 +1669,14 @@ class FileCreater(QWidget):
 
         create_params_file(creater_params)
 
-    def start_forcing_create(self):
-        self.create_forcing = True
-        self.file_create_thread.start()
-
     def start_params_create(self):
-        self.create_forcing = False
-        self.file_create_thread.start()
+        self.create_thread.start()
 
-class FileCreateThread(QThread):
+
+class ParamsCreateThread(QThread):
     def __init__(self, parent=None):
-        super(FileCreateThread, self).__init__(parent)
+        super(ParamsCreateThread, self).__init__(parent)
         self.parent = parent
 
     def run(self):
-        if self.parent.create_forcing:
-            self.parent.create_forcing_file()
-        else:
-            self.parent.create_parameters_file()
+        self.parent.create_parameters_file()

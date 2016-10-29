@@ -70,7 +70,8 @@ def read_stn_data(forcing_params):
             "data": data,
             "coords": coords,
             "var_name": variable["var_name"],
-            "type": variable["type"]
+            "type": variable["type"],
+            "itp_params": variable["itp_params"]
         })
         var_data.append(new_var)
 
@@ -203,7 +204,7 @@ def create_forcing(forcing_data, create_params):
         idp = create_params["idw_params"][0]
         maxd = create_params["idw_params"][1]
         maxp = create_params["idw_params"][2]
-        itp = functools.partial(idw, idp=idp, maxd=maxd)
+        itp = functools.partial(idw, idp=idp, maxd=maxd, maxp=maxp)
 
     # #################################### Create forcing files for every year.
     time_step = "days"
@@ -258,6 +259,7 @@ def create_forcing(forcing_data, create_params):
             data = variable["data"]
             coords = variable["coords"]
             var_type = variable["type"]
+            itp_params = variable["itp_params"]
             v = ff.createVariable(var_name, "f8", ("time", "lat", "lon"), fill_value=-9999)
 
             if forc_tem.get(var_type) is not None:
@@ -265,7 +267,20 @@ def create_forcing(forcing_data, create_params):
                 v.long_name = forc_tem.get(var_type)[1]
 
             # Interpolation
-            itp_data = itp(data[in_this_year], coords, grid_coords)
+            try:
+                idp = float(itp_params[0])
+            except Exception:
+                idp = 2.0
+            try:
+                maxd = float(itp_params[1])
+            except Exception:
+                maxd = 6.0
+            try:
+                maxp = int(itp_params[2])
+            except Exception:
+                maxp = 6
+
+            itp_data = idw(data[in_this_year], coords, grid_coords, idp=idp, maxd=maxd, maxp=maxp)
             values = np.zeros((time_len, mask.shape[0] * mask.shape[1])) - 9999.0
             values[:, sn] = itp_data
             v[:] = values
@@ -279,7 +294,7 @@ def create_forcing(forcing_data, create_params):
 # Inverse distance weight interpolation.
 #
 ########################################################################################################################
-def idw(stn_data, stn_coords, grid_coords, idp=2, maxd=np.inf):
+def idw(stn_data, stn_coords, grid_coords, idp=2, maxd=np.inf, maxp=None):
 
     n_grids = grid_coords.shape[0]
 

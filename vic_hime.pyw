@@ -11,7 +11,7 @@ import logging
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from interfaces import GlobalConfig, VicRun, Routing, Calibrater, FileCreater
+from interfaces import GlobalConfig, VicRun, Routing, Calibrater, ForcingCreater, ParamsCreater
 
 from Hime import log
 from Hime.vic_proj import VicProj
@@ -50,12 +50,8 @@ class MainWindow(QMainWindow):
         self.vic_run_panel = VicRun(self)
         self.routing_panel = Routing(self)
         self.calibrate_panel = Calibrater(self)
-        self.file_create_panel = FileCreater(self)
-
-        self.calib_layout = QVBoxLayout()
-        self.rout_layout = QVBoxLayout()
-        self.file_layout = QVBoxLayout()
-        self.forcing_layout = QVBoxLayout()
+        self.forcing_create_panel = ForcingCreater(self)
+        self.params_create_panel = ParamsCreater(self)
 
         #######################################################################
         # Set main interface.
@@ -66,7 +62,8 @@ class MainWindow(QMainWindow):
         tabs.addTab(self.vic_run_panel, "Run VIC")
         tabs.addTab(self.routing_panel, "Routing")
         tabs.addTab(self.calibrate_panel, "Calibrate")
-        tabs.addTab(self.file_create_panel, "Input file create")
+        tabs.addTab(self.forcing_create_panel, "Input file create")
+        tabs.addTab(self.params_create_panel, "Input file create")
 
         self.log_console = QTextBrowser()
         self.log_console.setMinimumWidth(300)
@@ -84,12 +81,19 @@ class MainWindow(QMainWindow):
         #######################################################################
         # Main window configs
         #######################################################################
-        self.resize(1080, 680)
-        self.setWindowTitle("VIC Hime " + __version__)
         main_widget = QWidget(self)
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+        settings = QSettings()
+        size = settings.value("MainWindow/Size", QVariant(QSize(1080, 680))).toSize()
+        self.resize(size)
+        position = settings.value("MainWindow/Position", QVariant(QPoint(0, 0))).toPoint()
+        self.move(position)
+        self.restoreState(settings.value("MainWindow/State").toByteArray())
+
+        self.base_window_title = "VIC Hime " + __version__
+        self.setWindowTitle(self.base_window_title)
         self.show()
         #######################################################################
         # Business configs.
@@ -106,7 +110,7 @@ class MainWindow(QMainWindow):
 
         self.current_proj_path = None
 
-        settings = QSettings()
+
         current_proj_path = unicode(settings.value("current_project").toString())
         if current_proj_path != "":
             self.load_proj(current_proj_path)
@@ -186,6 +190,8 @@ class MainWindow(QMainWindow):
         self.proj = self.proj.read_proj_file(proj_file)
         self.load_configs()
 
+        self.setWindowTitle(self.base_window_title + " - " + self.proj.proj_params["proj_name"])
+
     def open_proj(self):
         proj_file = QFileDialog.getOpenFileName(self, "Select project file.",
                                                 "VIC project files (*.vic_proj);All Files (*)")
@@ -205,7 +211,8 @@ class MainWindow(QMainWindow):
         self.global_config_panel.load_configs()
         self.vic_run_panel.load_configs()
         self.routing_panel.load_configs()
-        self.file_create_panel.load_configs()
+        self.forcing_create_panel.load_configs()
+        self.params_create_panel.load_configs()
 
     def ok_to_exist(self):
         if self.dirty:
@@ -231,6 +238,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, QCloseEvent):
         if self.ok_to_exist():
             settings = QSettings()
+            settings.setValue("MainWindow/Size", QVariant(self.size()))
+            settings.setValue("MainWindow/Position", QVariant(self.pos()))
+            settings.setValue("MainWindow/State", QVariant(self.saveState()))
+
             settings.setValue("current_project", self.current_proj_path)
         else:
             QCloseEvent.ignore()
