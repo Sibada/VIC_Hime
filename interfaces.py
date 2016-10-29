@@ -8,6 +8,8 @@ from Hime import log
 from Hime.model_execer.vic_execer import vic_exec
 from Hime.routing.uh_creater import create_rout
 from Hime.routing.confluence import write_rout_data, load_rout_data, confluence
+from Hime.file_creater.forcing_creater import read_stn_data, create_forcing
+from Hime.file_creater.param_creater import create_params_file
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
@@ -456,8 +458,7 @@ class GlobalConfig(QWidget):
 
     def save_setting(self):
         self.apply_configs()
-        self.parent.proj.write_proj_file()
-        log.info("Changes have saved.")
+        self.parent.save_proj()
 
     def set_file_by_dialog(self, line_edit, disc):
         file = QFileDialog.getOpenFileName(self, disc)
@@ -560,6 +561,8 @@ class VicRun(QWidget):
 
         self.apply_configs_btn = QPushButton("&Apply configs")
         self.mpi_cb = QCheckBox("Run with MPI")
+
+        self.apply_configs_btn = QPushButton("&Apply configs")
         self.run_btn = QPushButton("&Run VIC")
 
         self.vic_run_console = QTextBrowser()
@@ -576,6 +579,7 @@ class VicRun(QWidget):
         input_file_layout.addWidget(self.rout_cb, 1, 0, 1, 1)
 
         input_file_layout.addWidget(self.mpi_cb, 1, 2, 1, 1)
+        input_file_layout.addWidget(self.apply_configs_btn, 5, 5, 1, 1)
         input_file_layout.addWidget(self.run_btn, 5, 7, 1, 1)
 
         input_file_group.setLayout(input_file_layout)
@@ -587,6 +591,11 @@ class VicRun(QWidget):
         main_layout.addWidget(self.vic_run_console)
         self.setLayout(main_layout)
 
+        #######################################################################
+        # Connections.
+        #######################################################################
+        self.connect(self.vic_driver_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.vic_driver_le, disc="Set VIC driver file path"))
         self.connect(self.global_file_btn, SIGNAL("clicked()"),
                      lambda: self.set_file_by_dialog(line_edit=self.global_file_le, disc="Set global file path"))
         self.connect(self.vic_output_btn, SIGNAL("clicked()"),
@@ -597,6 +606,7 @@ class VicRun(QWidget):
                      lambda: self.set_dir_by_dialog(line_edit=self.rout_out_path_le, disc="Set routing output path."))
 
         self.connect(self.run_btn, SIGNAL("clicked()"), self.start_vic)
+        self.connect(self.apply_configs_btn, SIGNAL("clicked()"), self.apply_configs)
 
         #######################################################################
         # Business part
@@ -619,6 +629,13 @@ class VicRun(QWidget):
             return
         line_edit.setText(dir)
 
+    def output_writen(self, text):
+        cursor = self.parent.vic_run_console.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(text)
+        self.parent.vic_run_console.setTextCursor(cursor)
+        self.parent.vic_run_console.ensureCursorVisible()
+
     def run_vic(self):
         if self.rout_cb.isChecked() and self.parent.proj.proj_params.get("routing_config") is None:
             log.error("Routing configs was not set. Can not run with routing.")
@@ -627,7 +644,11 @@ class VicRun(QWidget):
         vic_path = unicode(self.vic_driver_le.text())
         n_cores = unicode(self.cores_le.text())
         use_mpi = True if self.mpi_cb.isChecked() else False
-        status = vic_exec(vic_path, unicode(self.global_file_le.text()), mpi=use_mpi, n_cores=int(n_cores))
+
+        status, logs = vic_exec(vic_path, unicode(self.global_file_le.text()), mpi=use_mpi,
+                          n_cores=n_cores)
+        self.vic_run_console.setText(logs)
+
         if status != 0:
             log.error("Error in VIC running.")
             return
@@ -638,7 +659,16 @@ class VicRun(QWidget):
         log.info("Routing complete.")
 
     def start_vic(self):
+        log.info("VIC start to run...")
+        self.vic_running = True
+        sys.stdout = StreamEmitter(text_written=self.output_writen)
+        sys.stderr = StreamEmitter(text_written=self.output_writen)
+
         self.vic_run_thread.start()
+
+        self.parent.vic_running = False
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
 
     def apply_configs(self):
         self.configs["vic_driver_path"] = unicode(self.vic_driver_le.text())
@@ -656,6 +686,8 @@ class VicRun(QWidget):
             self.configs["with_routing"] = False
 
         self.parent.proj.proj_params["vic_run_config"] = self.configs
+        self.parent.dirty = True
+        log.info("Configs has been applied.")
 
     def load_configs(self):
         if self.parent.proj.proj_params.get("vic_run_config") is None:
@@ -681,6 +713,26 @@ class VicRun(QWidget):
             self.rout_cb.setCheckState(Qt.Checked)
         else:
             self.rout_cb.setCheckState(Qt.Unchecked)
+
+
+class VICRunThread(QThread):
+    def __init__(self, parent=None):
+        super(VICRunThread, self).__init__(parent)
+        self.parent = parent
+
+    def run(self):
+        self.parent.run_vic()
+
+
+class StreamEmitter(QObject):
+    def __init__(self, parent=None, text_written=None):
+        super(StreamEmitter, self).__init__(parent)
+        self.parent = parent
+        if text_written is None:
+            self.text_written = pyqtSignal(str)
+
+    def write(self, text):
+        self.text_written.emit(str(text))
 
 
 ########################################################################################################################
@@ -871,6 +923,8 @@ class Routing(QWidget):
         self.configs["end_date"] = list(self.end_date_de.date().getDate())
 
         self.parent.proj.proj_params["routing_config"] = self.configs
+        self.parent.dirty = True
+        log.info("Configs has been applied.")
 
     def load_configs(self):
         if self.parent.proj.proj_params.get("routing_config") is None:
@@ -942,39 +996,6 @@ class Routing(QWidget):
         rout_data = load_rout_data(unicode(self.rout_data_file_le.text()))
         confluence(unicode(self.vic_out_file_le.text()), rout_data, unicode(self.domain_file_le.text()),
                    self.start_date_de.dateTime().toPyDateTime(), self.start_date_de.dateTime().toPyDateTime())
-
-
-class VICRunThread(QThread):
-    def __init__(self, parent=None):
-        super(VICRunThread, self).__init__(parent)
-        self.parent = parent
-
-    def run(self):
-        log.info("VIC start to run...")
-
-        self.parent.vic_running = True
-        sys.stdout = StreamEmitter(text_written=self.output_writen)
-        sys.stderr = StreamEmitter(text_written=self.output_writen)
-
-        self.parent.run_vic()
-
-        self.parent.vic_running = False
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-
-    def output_writen(self, text):
-        cursor = self.parent.vic_run_console.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.insertText(text)
-        self.parent.vic_run_console.setTextCursor(cursor)
-        self.parent.vic_run_console.ensureCursorVisible()
-
-
-class StreamEmitter(QObject):
-        text_written = pyqtSignal(str)
-
-        def write(self, text):
-            self.text_written.emit(str(text))
 
 
 ########################################################################################################################
@@ -1082,6 +1103,7 @@ class Calibrater(QWidget):
 class FileCreater(QWidget):
     def __init__(self, parent=None):
         super(FileCreater, self).__init__(parent)
+        self.parent = parent
 
         #######################################################################
         # Forcing file create group
@@ -1094,6 +1116,9 @@ class FileCreater(QWidget):
         self.forc_out_path_le = QLineEdit()
         self.forc_out_path_btn = QPushButton("...")
         self.forc_out_path_btn.setFixedWidth(36)
+        self.domain_file_le = QLineEdit()
+        self.domain_file_btn = QPushButton("...")
+        self.domain_file_btn.setFixedWidth(36)
         self.start_time_de = QDateTimeEdit()
         self.start_time_de.setDisplayFormat("yyyy-MM-dd")
         self.end_time_de = QDateTimeEdit()
@@ -1131,21 +1156,25 @@ class FileCreater(QWidget):
         forcing_layout = QGridLayout()
         forcing_group.setLayout(forcing_layout)
 
-        forcing_layout.addWidget(self.forcing_var_table, 0, 0, 6, 8)
-        forcing_layout.addWidget(self.add_item_btn, 6, 0, 1, 2)
+        forcing_layout.addWidget(self.forcing_var_table, 0, 0, 6, 9)
+        forcing_layout.addWidget(self.add_item_btn, 6, 2, 1, 1)
         forcing_layout.addWidget(self.remove_item_btn, 6, 4, 1, 2)
 
         forcing_layout.addWidget(QLabel("Forcing file prefix:"), 7, 0, 1, 2)
-        forcing_layout.addWidget(self.forc_prefix_le, 7, 2, 1, 2)
+        forcing_layout.addWidget(self.forc_prefix_le, 7, 2, 1, 1)
 
         forcing_layout.addWidget(QLabel("Forcing file output path:"), 8, 0, 1, 2)
         forcing_layout.addWidget(self.forc_out_path_le, 8, 2, 1, 4)
         forcing_layout.addWidget(self.forc_out_path_btn, 8, 6, 1, 1)
 
-        forcing_layout.addWidget(QLabel("Start time:"), 9, 0, 1, 1)
-        forcing_layout.addWidget(self.start_time_de, 9, 1, 1, 2)
-        forcing_layout.addWidget(QLabel("End time:"), 9, 5, 1, 1)
-        forcing_layout.addWidget(self.end_time_de, 9, 6, 1, 2)
+        forcing_layout.addWidget(QLabel("Domain file path:"), 9, 0, 1, 2)
+        forcing_layout.addWidget(self.domain_file_le, 9, 2, 1, 4)
+        forcing_layout.addWidget(self.domain_file_btn, 9, 6, 1, 1)
+
+        forcing_layout.addWidget(QLabel("Start time:"), 7, 3, 1, 1)
+        forcing_layout.addWidget(self.start_time_de, 7, 4, 1, 2)
+        forcing_layout.addWidget(QLabel("End time:"), 7, 6, 1, 1)
+        forcing_layout.addWidget(self.end_time_de, 7, 7, 1, 2)
 
         forcing_layout.addWidget(self.use_sh_cb, 10, 0, 1, 4)
         forcing_layout.addWidget(QLabel("Station coordinates file:"), 11, 0, 1, 2)
@@ -1163,7 +1192,6 @@ class FileCreater(QWidget):
 
         forcing_layout.addWidget(self.apply_configs_btn, 15, 3, 1, 2)
         forcing_layout.addWidget(self.forcing_start_btn, 15, 6, 1, 2)
-
 
         #######################################################################
         # Parameters file create group
@@ -1192,23 +1220,23 @@ class FileCreater(QWidget):
         params_group.setStyleSheet(group_ss)
         params_group.setTitle("Create parameters file")
 
-        params_layout.addWidget(QLabel("Station coordinates file:"), 0, 0, 1, 2)
-        params_layout.addWidget(self.soil_file_le, 0, 2, 1, 4)
-        params_layout.addWidget(self.soil_file_btn, 0, 6, 1, 1)
+        params_layout.addWidget(QLabel("Soil parameters file:"), 0, 0)
+        params_layout.addWidget(self.soil_file_le, 0, 1, 1, 2)
+        params_layout.addWidget(self.soil_file_btn, 0, 3, 1, 1)
 
-        params_layout.addWidget(QLabel("Station coordinates file:"), 1, 0, 1, 2)
-        params_layout.addWidget(self.veg_params_le, 1, 2, 1, 4)
-        params_layout.addWidget(self.veg_params_btn, 1, 6, 1, 1)
+        params_layout.addWidget(QLabel("Veg parameters file:"), 0, 4)
+        params_layout.addWidget(self.veg_params_le, 0, 5, 1, 2)
+        params_layout.addWidget(self.veg_params_btn, 0, 7)
 
-        params_layout.addWidget(QLabel("Station coordinates file:"), 2, 0, 1, 2)
-        params_layout.addWidget(self.veg_lib_le, 2, 2, 1, 4)
-        params_layout.addWidget(self.veg_lib_btn, 2, 6, 1, 1)
+        params_layout.addWidget(QLabel("Veg lib file:"), 1, 0)
+        params_layout.addWidget(self.veg_lib_le, 1, 1, 1, 2)
+        params_layout.addWidget(self.veg_lib_btn, 1, 3, 1, 1)
 
-        params_layout.addWidget(QLabel("Station coordinates file:"), 3, 0, 1, 2)
-        params_layout.addWidget(self.params_out_path_le, 3, 2, 1, 4)
-        params_layout.addWidget(self.params_out_path_btn, 3, 6, 1, 1)
+        params_layout.addWidget(QLabel("Output path:"), 1, 4)
+        params_layout.addWidget(self.params_out_path_le, 1, 5, 1, 2)
+        params_layout.addWidget(self.params_out_path_btn, 1, 7)
 
-        params_layout.addWidget(self.params_create_btn, 4, 5, 1, 2)
+        params_layout.addWidget(self.params_create_btn, 2, 5, 1, 3)
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(forcing_group)
@@ -1216,3 +1244,274 @@ class FileCreater(QWidget):
         main_layout.addWidget(params_group)
 
         self.setLayout(main_layout)
+
+        #######################################################################
+        # Connections.
+        #######################################################################
+        self.connect(self.forc_out_path_btn, SIGNAL("clicked()"),
+                     lambda: self.set_dir_by_dialog(line_edit=self.forc_out_path_le, disc="Set forcing file output path"))
+        self.connect(self.domain_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.domain_file_le, disc="Set domain file"))
+        self.connect(self.sh_coords_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.sh_coords_le, disc="Set station coordinates file"))
+        self.connect(self.sh_data_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.sh_data_le, disc="Set sunshine hours data file"))
+        self.connect(self.temp_data_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.temp_data_le, disc="Set temperature file"))
+        self.connect(self.vp_data_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.vp_data_le, disc="Set vapor pressure file"))
+
+        self.connect(self.soil_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.soil_file_le, disc="Set soil file"))
+        self.connect(self.veg_params_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.veg_params_le, disc="Set veg params file"))
+        self.connect(self.veg_lib_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.veg_lib_le, disc="Set veg lib file"))
+        self.connect(self.params_out_path_btn, SIGNAL("clicked()"),
+                     lambda: self.set_dir_by_dialog(line_edit=self.params_out_path_le, disc="Set parameters files output path"))
+
+        self.connect(self.apply_configs_btn, SIGNAL("clicked()"), self.apply_configs)
+
+        self.connect(self.add_item_btn, SIGNAL("clicked()"), lambda: self.add_item(table=self.forcing_var_table))
+        self.connect(self.remove_item_btn, SIGNAL("clicked()"), lambda: self.remove_item(table=self.forcing_var_table))
+
+        self.connect(self.forcing_start_btn, SIGNAL("clicked()"), self.start_forcing_create)
+        self.connect(self.params_create_btn, SIGNAL("clicked()"), self.start_params_create)
+
+        #######################################################################
+        # Business part.
+        #######################################################################
+        self.configs = None
+        self.file_create_thread = FileCreateThread(self)
+        self.create_forcing = True
+
+    def set_file_by_dialog(self, line_edit, disc):
+        file = QFileDialog.getOpenFileName(self, disc)
+        log.debug("Get file: %s" % file)
+        if file == "":
+            return
+        line_edit.setText(file)
+
+    def set_dir_by_dialog(self, line_edit, disc):
+        dir = QFileDialog.getExistingDirectory(self, disc)
+        log.debug("Get dir: %s" % dir)
+        if dir == "":
+            return
+        line_edit.setText(dir)
+
+    def load_configs(self):
+        if self.parent.proj.proj_params.get("file_create_configs") is None:
+            self.configs = OrderedDict()
+            self.configs["forc_prefix"] = "forcing."
+
+            proj_path = self.parent.proj.proj_params["proj_path"]
+            self.configs["forc_out_path"] = proj_path
+            self.configs["domain_file"] = proj_path + "/domain.nc"
+            self.configs["start_time"] = [1960, 1, 1]
+            self.configs["end_time"] = [1970, 12, 31]
+
+            self.configs["use_sh"] = False
+
+            self.configs["sh_coords"] = proj_path + "/sh_coords.txt"
+            self.configs["sh_data"] = proj_path + "/sh_data.txt"
+            self.configs["temp_data"] = proj_path + "/temp_data.txt"
+            self.configs["vp_data"] = proj_path + "/vp_data.txt"
+
+            self.configs["soil"] = proj_path + "/soil_params.txt"
+            self.configs["veg"] = proj_path + "/veg_params.txt"
+            self.configs["veg_lib"] = proj_path + "/veg_lib.txt"
+            self.configs["out_path"] = proj_path
+
+            self.configs["forcing_vars"] = []
+        else:
+            self.configs = self.parent.proj.proj_params.get("file_create_configs")
+
+        self.forc_prefix_le.setText(self.configs["forc_prefix"])
+
+        self.forc_out_path_le.setText(self.configs["forc_out_path"])
+        self.domain_file_le.setText(self.configs["domain_file"])
+        sdt = self.configs["start_time"]
+        self.start_time_de.setDateTime(dt(sdt[0], sdt[1], sdt[2]))
+        edt = self.configs["end_time"]
+        self.end_time_de.setDateTime(dt(edt[0], edt[1], edt[2]))
+
+        if self.configs["use_sh"]:
+            self.use_sh_cb.setCheckState(Qt.Checked)
+        else:
+            self.use_sh_cb.setCheckState(Qt.Unchecked)
+
+        self.sh_coords_le.setText(self.configs["sh_coords"])
+        self.sh_data_le.setText(self.configs["sh_data"])
+        self.temp_data_le.setText(self.configs["temp_data"])
+        self.vp_data_le.setText(self.configs["vp_data"])
+
+        self.soil_file_le.setText(self.configs["soil"])
+        self.veg_params_le.setText(self.configs["veg"])
+        self.veg_lib_le.setText(self.configs["veg_lib"])
+        self.params_out_path_le.setText(self.configs["out_path"])
+
+        forcing_vars = self.configs["forcing_vars"]
+        self.forcing_var_table.setRowCount(len(forcing_vars))
+        for i in range(len(forcing_vars)):
+            for j in range(4):
+                self.forcing_var_table.setItem(i, j, QTableWidgetItem(forcing_vars[i][j]))
+
+    def apply_configs(self):
+        self.configs["forc_prefix"] = unicode(self.forc_prefix_le.text())
+
+        self.configs["forc_out_path"] = unicode(self.forc_out_path_le.text())
+        self.configs["domain_file"] = unicode(self.domain_file_le.text())
+        self.configs["start_time"] = list(self.start_time_de.date().getDate())
+        self.configs["end_time"] = list(self.end_time_de.date().getDate())
+
+        self.configs["use_sh"] = True if self.use_sh_cb.isChecked() else False
+        self.configs["sh_coords"] = unicode(self.sh_coords_le.text())
+        self.configs["sh_data"] = unicode(self.sh_data_le.text())
+        self.configs["temp_data"] = unicode(self.temp_data_le.text())
+        self.configs["vp_data"] = unicode(self.vp_data_le.text())
+
+        self.configs["soil"] = unicode(self.soil_file_le.text())
+        self.configs["veg"] = unicode(self.veg_params_le.text())
+        self.configs["veg_lib"] = unicode(self.veg_lib_le.text())
+        self.configs["out_path"] = unicode(self.params_out_path_le.text())
+
+        vars = []
+        for i in range(self.forcing_var_table.rowCount()):
+            var = []
+            for j in range(4):
+                var.append(unicode(self.forcing_var_table.item(i, j).text()))
+            vars.append(var)
+        self.configs["forcing_vars"] = vars
+
+        self.parent.proj.proj_params["file_create_configs"] = self.configs
+        self.parent.dirty = True
+        log.info("Configs has been applied.")
+
+    def add_item(self, table):
+        nrow_o = table.rowCount()
+        table.setRowCount(nrow_o + 1)
+        if nrow_o < 1:
+            return
+        for i in range(table.columnCount()):
+            table.setItem(nrow_o, i, QTableWidgetItem(table.item(nrow_o-1, i)))
+
+    def remove_item(self, table):
+        rs = [ind.row() for ind in table.selectedIndexes()]
+        rs = list(set(rs))
+        rs.sort(reverse=True)
+        [table.removeRow(r) for r in rs]
+        log.debug("Remove row %s" % rs)
+
+    def create_forcing_params(self):
+        forcing_params = OrderedDict()
+        variables = []
+        nvar = self.forcing_var_table.rowCount()
+        for r in range(nvar):
+            var = {
+                "data_path": unicode(self.forcing_var_table.item(r, 0).text()),
+                "coords_path": unicode(self.forcing_var_table.item(r, 1).text()),
+                "var_name": unicode(self.forcing_var_table.item(r, 2).text()),
+                "type": unicode(self.forcing_var_table.item(r, 3).text())
+            }
+            variables.append(var)
+        forcing_params["variables"] = variables
+
+        forcing_params["start_time"] = list(self.start_time_de.date().getDate())
+        forcing_params["end_time"] = list(self.end_time_de.date().getDate())
+        forcing_params["freq"] = "D"
+
+        if self.use_sh_cb.isChecked():
+            forcing_params["use_sh"] = [unicode(self.sh_coords_le.text()),
+                                        unicode(self.sh_data_le.text()),
+                                        unicode(self.temp_data_le.text()),
+                                        unicode(self.vp_data_le.text()),
+                                        "swdown",
+                                        "lwdown"]
+        else:
+            forcing_params["use_sh"] = None
+
+        return forcing_params
+
+    def create_create_params(self):
+        create_params = OrderedDict()
+        forc_path = unicode(self.forc_out_path_le.text())
+        if forc_path[-1] != "/":
+            forc_path += "/"
+        forc_path += unicode(self.forc_prefix_le.text())
+        create_params["forcing_path"] = forc_path
+        create_params["domain_file"] = unicode(self.domain_file_le.text())
+        create_params["idw_params"] = [2, 6, 6]
+        create_params["krige_params"] = ["exp"]
+
+        return create_params
+
+    def create_forcing_file(self):
+        os.makedirs(unicode(self.forc_out_path_le.text()))
+        forcing_params = self.create_forcing_params()
+        forcing_data = read_stn_data(forcing_params)
+
+        create_params = self.create_create_params()
+        create_forcing(forcing_data, create_params)
+# creater_params = {
+#     "soil_file": "/home/victi/TRMM_VIC/params/soil/soil.txt",
+#     "fract_file": None,
+#     "snow_band": 1,
+#     "n_layer": 3,
+#     "organic": False,
+#     "compute_treeline": False,
+#
+#     "veg_file": "/home/victi/TRMM_VIC/params/veg_param.txt",
+#     "n_rootzones": 3,
+#
+#     "veg_lib_file": "/home/victi/TRMM_VIC/params/veglib.LDAS",
+#     "veg_class": 12,
+#     "veglib_vegcover": False,
+#
+#     "dec": 6,
+#     "params_file": "/home/victi/TRMM_VIC/SC/params.nc",
+#     "domain_file": "/home/victi/TRMM_VIC/SC/domain.nc"
+# }
+    def create_parameters_file(self):
+        creater_params = OrderedDict()
+        creater_params["soil_file"] = unicode(self.soil_file_le.text())
+        creater_params["fract_file"] = None
+        creater_params["snow_band"] = 1
+        creater_params["n_layer"] = 3
+        creater_params["organic"] = False
+        creater_params["compute_treeline"] = False
+
+        creater_params["veg_file"] = unicode(self.veg_params_le.text())
+        creater_params["n_rootzones"] = 3
+
+        creater_params["veg_lib_file"] = unicode(self.veg_lib_le.text())
+        creater_params["veg_class"] = 12
+        creater_params["veglib_vegcover"] = False
+
+        creater_params["dec"] = 6
+
+        out_path = unicode(self.params_out_path_le.text())
+        if out_path[-1] != "/":
+            out_path += "/"
+        creater_params["params_file"] = out_path + "params.nc"
+        creater_params["domain_file"] = out_path + "domain.nc"
+
+        create_params_file(creater_params)
+
+    def start_forcing_create(self):
+        self.create_forcing = True
+        self.file_create_thread.start()
+
+    def start_params_create(self):
+        self.create_forcing = False
+        self.file_create_thread.start()
+
+class FileCreateThread(QThread):
+    def __init__(self, parent=None):
+        super(FileCreateThread, self).__init__(parent)
+        self.parent = parent
+
+    def run(self):
+        if self.parent.create_forcing:
+            self.parent.create_forcing_file()
+        else:
+            self.parent.create_parameters_file()

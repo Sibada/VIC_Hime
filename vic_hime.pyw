@@ -101,9 +101,16 @@ class MainWindow(QMainWindow):
 
         box_log = logging.StreamHandler(StreamEmitter(text_written=self.output_writen))
         box_log.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s',
-                                                   datefmt='%Y-%m-%d %H:%M:%S'))
+                                               datefmt='%Y-%m-%d %H:%M:%S'))
         log.addHandler(box_log)
 
+        self.current_proj_path = None
+
+        settings = QSettings()
+        current_proj_path = unicode(settings.value("current_project").toString())
+        if current_proj_path != "":
+            self.load_proj(current_proj_path)
+            self.current_proj_path = current_proj_path
 
     ####################################################################################################################
     #
@@ -147,7 +154,7 @@ class MainWindow(QMainWindow):
 
     ####################################################################################################################
     #
-    # Service functions
+    # Business functions
     #
     ####################################################################################################################
     def create_proj(self):
@@ -165,25 +172,24 @@ class MainWindow(QMainWindow):
             if not os.path.exists(proj_path) or \
                             QMessageBox.question(self, 'Directory exist', 'Directory exist, Overwrite it?',
                                                  QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes:
+
                 log.info("Create VIC project %s" % proj_name)
                 self.proj = VicProj(proj_name, proj_path, True)
+                self.current_proj_path = proj_path
+                self.load_configs()
 
-                self.global_config_panel.load_configs()
-                self.vic_run_panel.load_configs()
-                self.routing_panel.load_configs()
-
-    def open_proj(self):
-        proj_file = QFileDialog.getOpenFileName(self, "Select project file.",
-                                                "VIC project files (*.vic_proj);All Files (*)")
+    def load_proj(self, proj_file):
         log.debug("Read proj: %s" % proj_file)
         if proj_file == "":
             return
         self.proj = VicProj()
         self.proj = self.proj.read_proj_file(proj_file)
+        self.load_configs()
 
-        self.global_config_panel.load_configs()
-        self.vic_run_panel.load_configs()
-        self.routing_panel.load_configs()
+    def open_proj(self):
+        proj_file = QFileDialog.getOpenFileName(self, "Select project file.",
+                                                "VIC project files (*.vic_proj);All Files (*)")
+        self.load_proj(proj_file)
 
     def save_proj(self):
         if self.proj is None:
@@ -191,7 +197,25 @@ class MainWindow(QMainWindow):
             return
 
         self.proj.write_proj_file()
+        self.dirty = False
         log.info("Changes have saved.")
+
+    def load_configs(self):
+        self.current_proj_path = self.proj.proj_params["proj_file"]
+        self.global_config_panel.load_configs()
+        self.vic_run_panel.load_configs()
+        self.routing_panel.load_configs()
+        self.file_create_panel.load_configs()
+
+    def ok_to_exist(self):
+        if self.dirty:
+            reply = QMessageBox.question(self, "VIC Hime: Unsaved Changes","Save unsaved changes?",
+                            QMessageBox.Yes|QMessageBox.No|QMessageBox.Cancel)
+            if reply == QMessageBox.Cancel:
+                return False
+            elif reply == QMessageBox.Yes:
+                self.save_proj()
+        return True
 
     def about(self):
         QMessageBox.about(self, "About VIC Hime",
@@ -203,6 +227,13 @@ class MainWindow(QMainWindow):
                           <p>Python %s - Qt %s - PyQt %s on %s
                           """ % (__version__, platform.python_version(),
                                  QT_VERSION_STR, PYQT_VERSION_STR, platform.system()))
+
+    def closeEvent(self, QCloseEvent):
+        if self.ok_to_exist():
+            settings = QSettings()
+            settings.setValue("current_project", self.current_proj_path)
+        else:
+            QCloseEvent.ignore()
 
 
 class CreateProjDialog(QDialog):

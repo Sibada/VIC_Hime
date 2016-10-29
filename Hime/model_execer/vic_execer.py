@@ -5,16 +5,21 @@
 Run VIC Image Driver.
 """
 
-import os
+import subprocess as sp
 
 
-def vic_exec(driver_path, global_path, log_path=None, mpi=False, n_cores=4):
+def vic_exec(driver_path, global_path, mpi=False, n_cores=4):
     if mpi:
-        sh = "mpiexec -np %d %s -g %s" % (n_cores, driver_path, global_path)
+        sh = ["mpiexec", "-np", n_cores, driver_path, "-g", global_path]
     else:
-        sh = "%s -g %s" % (driver_path, global_path)
-    if log_path is not None:
-        sh = sh + " " + log_path
-    print "Exec shell: " + sh
-    return os.system(sh)
+        sh = [driver_path, "-g", global_path]
+
+    print "Exec shell: "
+    print sh
+
+    spc = sp.Popen(sh, stdout=sp.PIPE, stderr=sp.PIPE)
+    status = spc.wait()
+    logs = spc.stdout.readlines()
+    logs.append(spc.stderr.readlines())
+    return status, logs
 

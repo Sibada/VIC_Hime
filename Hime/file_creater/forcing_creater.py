@@ -40,8 +40,8 @@ import netCDF4 as nc
 # {
 #   "variables": [{"data_path": "path", "coords_path": "path", "var_name": "var_name", "type": "desc"}, ...],
 #   "start_time": [year, month, day],
-#   "use_sh": ["sh_path", "temp_path", "vp_path", "sw_var_name", "lw_var_name"],
-#   "coords_path": "coords_path"
+#   "end_time": [year, month, day],
+#   "use_sh": ["coords_path": "coords_path", "sh_path", "temp_path", "vp_path", "sw_var_name", "lw_var_name"],
 # }
 # type must be one of those: TEMP, PREC, PRESS, SWDOWN, LWDOWN, VP, WIND
 def read_stn_data(forcing_params):
@@ -63,7 +63,7 @@ def read_stn_data(forcing_params):
 
     var_data = []
     for variable in variables:
-        log.info("Reading %s" % variable["path"])
+        log.info("Reading %s" % variable["data_path"])
         data = np.array(pd.read_table(variable["data_path"], sep=r"[\s,;]", header=None))
         coords = np.array(pd.read_table(variable["coords_path"], sep=r"[\s,;]", header=None))
         new_var = OrderedDict({
@@ -86,15 +86,15 @@ def read_stn_data(forcing_params):
     #
     # ###################################################################################
     if use_sh is not None:
-        sh_path = use_sh[0]
-        temp_path = use_sh[1]
-        vp_path = use_sh[2]
+        coords_path = use_sh[0]
+        sh_path = use_sh[1]
+        temp_path = use_sh[2]
+        vp_path = use_sh[3]
 
-        sw_var_name = use_sh[3]
-        lw_var_name = use_sh[4]
+        sw_var_name = use_sh[4]
+        lw_var_name = use_sh[5]
 
         # TODO: Check if those before is empty string.
-        coords_path = forcing_params["coords_path"]
         coords = np.array(pd.read_table(coords_path, sep=r"[\s,;]", header=None))
         sh = np.array(pd.read_table(sh_path, sep=r"[\s,;]", header=None))
         temp = np.array(pd.read_table(temp_path, sep=r"[\s,;]", header=None))
@@ -271,6 +271,7 @@ def create_forcing(forcing_data, create_params):
             v[:] = values
 
         ff.close()
+    log.info("Forcing file creating completed.")
 
 
 ########################################################################################################################

@@ -393,6 +393,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
         domain.description = "VIC domain file created by VIC Hime " + __version__ + " at "\
                              + datetime.datetime.now().strftime('%Y-%m-%d, %H:%M:%S')
     domain.close()
+    log.info("Files have been writen.")
 
 
 ########################################################################################################################
