@@ -7,9 +7,10 @@ from Hime import templates_path
 from Hime import log
 from Hime.model_execer.vic_execer import vic_exec
 from Hime.routing.uh_creater import create_rout
-from Hime.routing.confluence import write_rout_data, load_rout_data, confluence
+from Hime.routing.confluence import write_rout_data, load_rout_data, confluence, write_runoff_data, gather_to_month
 from Hime.file_creater.forcing_creater import read_stn_data, create_forcing
 from Hime.file_creater.param_creater import create_params_file
+from Hime.calibrater.calibrater import calibrate
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
@@ -326,7 +327,7 @@ class GlobalConfig(QWidget):
         self.layers_le.setText(unicode(global_params["nlayer"]))
 
         self.param_path_le.setText(unicode(global_params["param_file"]))
-        self.domain_path_le.setText(unicode(global_params["domain_path"]))
+        self.domain_path_le.setText(unicode(global_params["domain_file"]))
 
         if global_params.get("full_energy") == "TRUE":
             self.full_energy_cb.setCheckState(Qt.Checked)
@@ -406,13 +407,13 @@ class GlobalConfig(QWidget):
 
         global_params["calendar"] = unicode(self.calendar_co.currentText())
 
-        global_params["model_steps_per_day"] = unicode(self.model_steps_le.text())
-        global_params["snow_steps_per_day"] = unicode(self.model_steps_le.text())
-        global_params["runoff_steps_per_day"] = unicode(self.model_steps_le.text())
-        global_params["nodes"] = unicode(self.model_steps_le.text())
-        global_params["nlayer"] = unicode(self.model_steps_le.text())
-        global_params["param_file"] = unicode(self.model_steps_le.text())
-        global_params["domain_file"] = unicode(self.model_steps_le.text())
+        global_params["model_steps_per_day"] = int(self.model_steps_le.text())
+        global_params["snow_steps_per_day"] = int(self.model_steps_le.text())
+        global_params["runoff_steps_per_day"] = int(self.model_steps_le.text())
+        global_params["nodes"] = int(self.nodes_le.text())
+        global_params["nlayer"] = int(self.layers_le.text())
+        global_params["param_file"] = unicode(self.param_path_le.text())
+        global_params["domain_file"] = unicode(self.domain_path_le.text())
 
         global_params["full_energy"] = "TRUE" if self.full_energy_cb.isChecked() else "False"
         global_params["close_energy"] = "TRUE" if self.close_energy_cb.isChecked() else "False"
@@ -475,12 +476,12 @@ class GlobalConfig(QWidget):
         line_edit.setText(dir)
 
     def set_forcing_path(self):
-        file = QFileDialog.getOpenFileName(self, "Set forcing files")
-        log.debug("Get file: %s" % file)
-        if file == "":
+        forcing_file = QFileDialog.getOpenFileName(self, "Set forcing files")
+        log.debug("Get file: %s" % forcing_file)
+        if forcing_file == "":
             return
-        file = re.sub(r"\d\d\d\d\.nc", "", unicode(file))
-        self.forcing_path_le.setText(file)
+        forcing_file = re.sub(r"\d\d\d\d\.nc", "", unicode(forcing_file))
+        self.forcing_path_le.setText(forcing_file)
 
     def add_item(self, table):
         nrow_o = table.rowCount()
@@ -645,9 +646,9 @@ class VicRun(QWidget):
         n_cores = unicode(self.cores_le.text())
         use_mpi = True if self.mpi_cb.isChecked() else False
 
-        status, logs = vic_exec(vic_path, unicode(self.global_file_le.text()), mpi=use_mpi,
-                          n_cores=n_cores)
-        self.vic_run_console.setText(logs)
+        status, logs = vic_exec(vic_path, unicode(self.global_file_le.text()), mpi=use_mpi, n_cores=n_cores)
+        for line in logs:
+            self.vic_run_console.setText(unicode(line))
 
         if status != 0:
             log.error("Error in VIC running.")
@@ -669,6 +670,7 @@ class VicRun(QWidget):
         self.parent.vic_running = False
         sys.stdout = sys.__stdout__
         sys.stderr = sys.__stderr__
+        log.info("VIC run completed.")
 
     def apply_configs(self):
         self.configs["vic_driver_path"] = unicode(self.vic_driver_le.text())
@@ -974,8 +976,8 @@ class Routing(QWidget):
             "diffu": unicode(self.diffu_file_le.text()),
             "station": {
                 "name": unicode(self.stn_name_le.text()),
-                "x": unicode(self.stn_x_le.text()),
-                "y": unicode(self.stn_y_le.text())
+                "x": int(self.stn_x_le.text()) - 1,
+                "y": int(self.stn_y_le.text()) - 1
             },
             "uh_slope": unicode(self.uh_slope_data_le.text())
         }
@@ -993,9 +995,21 @@ class Routing(QWidget):
         write_rout_data(rout_data, unicode(self.out_rout_data_le.text()))
 
     def routing(self):
+        log.info("Read rout data file.")
         rout_data = load_rout_data(unicode(self.rout_data_file_le.text()))
-        confluence(unicode(self.vic_out_file_le.text()), rout_data, unicode(self.domain_file_le.text()),
-                   self.start_date_de.dateTime().toPyDateTime(), self.start_date_de.dateTime().toPyDateTime())
+        log.info("Routing start...")
+        runoffs = confluence(unicode(self.vic_out_file_le.text()), rout_data, unicode(self.domain_file_le.text()),
+                   self.start_date_de.dateTime().toPyDateTime(), self.end_date_de.dateTime().toPyDateTime())
+        log.info("Routing completed.")
+        runoffs_m = gather_to_month(runoffs)
+
+        out_dir = unicode(self.rout_out_dir_le.text())
+        if out_dir[-1] != "/":
+            out_dir += "/"
+        write_runoff_data(runoffs, unicode(self.rout_out_dir_le.text()) +
+                          unicode(self.stn_name_le.text()) + "_daily.txt")
+        write_runoff_data(runoffs_m, unicode(self.rout_out_dir_le.text()) +
+                          unicode(self.stn_name_le.text()) + "_monthly.txt")
 
 
 ########################################################################################################################
@@ -1007,33 +1021,51 @@ class Routing(QWidget):
 class Calibrater(QWidget):
     def __init__(self, parent=None):
         super(Calibrater, self).__init__(parent)
+        self.parent = parent
 
         self.param_file_le = QLineEdit()
         self.param_file_btn = QPushButton("...")
         self.param_file_btn.setFixedWidth(36)
+        self.obs_runoff_file_le = QLineEdit()
+        self.obs_runoff_file_btn = QPushButton("...")
+        self.obs_runoff_file_btn.setFixedWidth(36)
+
+        self.obs_start_date_de = QDateTimeEdit()
+        self.obs_start_date_de.setDisplayFormat("yyyy-MM-dd")
+        self.time_scale_le = QLineEdit()
+
         self.calib_range_cb = QCheckBox("Use other calibrate range (default basin)")
         self.calib_range_le = QLineEdit()
         self.calib_range_btn = QPushButton("...")
         self.calib_range_btn.setFixedWidth(36)
         self.bpc_le = QLineEdit()
-        self.bpc_le.setFixedWidth(36)
+        self.bpc_le.setFixedWidth(56)
         self.only_bias_cb = QCheckBox("Objective function set only BIAS")
 
+        self.turns_le = QLineEdit()
+        self.turns_le.setFixedWidth(56)
         self.max_iterate_le = QLineEdit()
-        self.max_iterate_le.setFixedWidth(36)
+        self.max_iterate_le.setFixedWidth(56)
         self.toler_threshold_le = QLineEdit()
-        self.toler_threshold_le.setFixedWidth(36)
+        self.toler_threshold_le.setFixedWidth(56)
 
-        self.calib_param_table = QTableWidget()
+        self.start_date_de = QDateTimeEdit()
+        self.start_date_de.setDisplayFormat("yyyy-MM-dd")
+        self.calib_start_date_de = QDateTimeEdit()
+        self.calib_start_date_de.setDisplayFormat("yyyy-MM-dd")
+        self.end_date_de = QDateTimeEdit()
+        self.end_date_de.setDisplayFormat("yyyy-MM-dd")
+
+        self.calib_params_table = QTableWidget()
         self.calib_result_table = QTableWidget()
 
-        self.calib_param_table.setRowCount(6)
-        self.calib_param_table.setColumnCount(3)
-        self.calib_param_table.setHorizontalHeaderLabels(
+        self.calib_params_table.setRowCount(6)
+        self.calib_params_table.setColumnCount(3)
+        self.calib_params_table.setHorizontalHeaderLabels(
             ["x1", "x2", "x3"])
-        self.calib_param_table.setVerticalHeaderLabels(
+        self.calib_params_table.setVerticalHeaderLabels(
             ["Infilt", "Ds", "Dsm", "Ws", "d2", "d3"])
-        header = self.calib_param_table.horizontalHeader()
+        header = self.calib_params_table.horizontalHeader()
         for i in range(3):
             header.setResizeMode(i, QHeaderView.Stretch)
 
@@ -1058,20 +1090,39 @@ class Calibrater(QWidget):
         setting_layout.addWidget(QLabel("Parameters file:"), 0, 0, 1, 2)
         setting_layout.addWidget(self.param_file_le, 0, 2, 1, 6)
         setting_layout.addWidget(self.param_file_btn, 0, 8, 1, 1)
-        setting_layout.addWidget(QLabel("Calibrate range:"), 1, 0, 1, 2)
-        setting_layout.addWidget(self.calib_range_le, 1, 2, 1, 6)
-        setting_layout.addWidget(self.calib_range_btn, 1, 8, 1, 1)
-        setting_layout.addWidget(self.calib_range_cb, 2, 0, 1, 5)
-        setting_layout.addWidget(QLabel("Bias Propotion Coefficient:"), 3, 0, 1, 3)
-        setting_layout.addWidget(self.bpc_le, 3, 3, 1, 1)
-        setting_layout.addWidget(self.only_bias_cb, 4, 0, 1, 5)
-        setting_layout.addWidget(QLabel("Max iterations:"), 5, 0, 1, 2)
-        setting_layout.addWidget(self.max_iterate_le, 5, 2, 1, 1)
-        setting_layout.addWidget(QLabel("Toler threshold:"), 6, 0, 1, 2)
-        setting_layout.addWidget(self.toler_threshold_le, 6, 2, 1, 1)
 
-        setting_layout.addWidget(self.apply_configs_btn, 7, 2, 1, 2)
-        setting_layout.addWidget(self.start_btn, 7, 6, 1, 3)
+        setting_layout.addWidget(QLabel("Observation runoff file:"), 1, 0, 1, 2)
+        setting_layout.addWidget(self.obs_runoff_file_le, 1, 2, 1, 6)
+        setting_layout.addWidget(self.obs_runoff_file_btn, 1, 8, 1, 1)
+
+        setting_layout.addWidget(QLabel("Obs runoff start time"), 2, 0, 1, 2)
+        setting_layout.addWidget(self.obs_start_date_de, 2, 2, 1, 2)
+        setting_layout.addWidget(QLabel("Time scale (M ro D):"), 2, 5, 1, 2)
+        setting_layout.addWidget(self.time_scale_le, 2, 7, 1, 1)
+
+        setting_layout.addWidget(QLabel("VIC start time:"), 3, 0, 1, 1)
+        setting_layout.addWidget(self.start_date_de, 3, 1, 1, 1)
+        setting_layout.addWidget(QLabel("Calibrate start time:"), 3, 2, 1, 2)
+        setting_layout.addWidget(self.calib_start_date_de, 3, 4, 1, 1)
+        setting_layout.addWidget(QLabel("Calibrate end time:"), 3, 5, 1, 2)
+        setting_layout.addWidget(self.end_date_de, 3, 7, 1, 2)
+
+        setting_layout.addWidget(self.calib_range_cb, 4, 0, 1, 5)
+        setting_layout.addWidget(QLabel("Calibrate range:"), 5, 0, 1, 1)
+        setting_layout.addWidget(self.calib_range_le, 5, 1, 1, 6)
+        setting_layout.addWidget(self.calib_range_btn, 5, 7, 1, 1)
+        setting_layout.addWidget(QLabel("Bias Propotion Coefficient:"), 6, 0, 1, 2)
+        setting_layout.addWidget(self.bpc_le, 6, 2, 1, 1)
+        setting_layout.addWidget(self.only_bias_cb, 6, 4, 1, 3)
+        setting_layout.addWidget(QLabel("Turns:"), 7, 0, 1, 1)
+        setting_layout.addWidget(self.turns_le, 7, 1, 1, 1)
+        setting_layout.addWidget(QLabel("Max iterations:"), 7, 2, 1, 2)
+        setting_layout.addWidget(self.max_iterate_le, 7, 4, 1, 1)
+        setting_layout.addWidget(QLabel("Toler threshold:"), 7, 5, 1, 2)
+        setting_layout.addWidget(self.toler_threshold_le, 7, 7, 1, 1)
+
+        setting_layout.addWidget(self.apply_configs_btn, 8, 2, 1, 2)
+        setting_layout.addWidget(self.start_btn, 8, 6, 1, 3)
 
         calib_params_group = QGroupBox()
         calib_params_group.setStyleSheet(group_ss)
@@ -1079,7 +1130,7 @@ class Calibrater(QWidget):
         calib_params_layout = QVBoxLayout()
         calib_params_group.setLayout(calib_params_layout)
         calib_params_layout.addWidget(QLabel("Initiate parameters:"))
-        calib_params_layout.addWidget(self.calib_param_table)
+        calib_params_layout.addWidget(self.calib_params_table)
         calib_params_layout.addStretch(1)
         calib_params_layout.addWidget(QLabel("Calibrate results:"))
         calib_params_layout.addWidget(self.calib_result_table)
@@ -1092,6 +1143,216 @@ class Calibrater(QWidget):
         main_layout.addLayout(up_layout)
         main_layout.addWidget(self.run_console)
         self.setLayout(main_layout)
+
+        #######################################################################
+        # Connections.
+        #######################################################################
+        self.connect(self.param_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.param_file_le, disc="Set parameters file."))
+        self.connect(self.calib_range_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.calib_range_le, disc="Set calibrate range file."))
+        self.connect(self.obs_runoff_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.obs_runoff_file_le, disc="Set observation runoff file."))
+
+        self.connect(self.apply_configs_btn, SIGNAL("clicked()"), self.apply_configs)
+        self.connect(self.start_btn, SIGNAL("clicked()"), self.calibrate_start)
+
+        self.calibrate_thread = CalibrateThread(self)
+
+    def set_file_by_dialog(self, line_edit, disc):
+        file = QFileDialog.getOpenFileName(self, disc)
+        log.debug("Open file: %s" % file)
+        if file == "":
+            return
+        line_edit.setText(file)
+
+    def set_dir_by_dialog(self, line_edit, disc):
+        dir = QFileDialog.getExistingDirectory(self, disc)
+        log.debug("Open directory: %s" % dir)
+        if dir == "":
+            return
+        line_edit.setText(dir)
+
+    def apply_configs(self):
+        self.configs["params_file"] = unicode(self.param_file_le.text())
+        self.configs["runoff_obs"] = unicode(self.obs_runoff_file_le.text())
+        self.configs["calib_range"] = unicode(self.calib_range_le.text())
+
+        self.configs["time_scale"] = unicode(self.time_scale_le.text())
+
+        self.configs["BPC"] = float(self.bpc_le.text())
+        self.configs["turns"] = int(self.turns_le.text())
+        self.configs["max_iterate"] = int(self.max_iterate_le.text())
+        self.configs["toler_threshold"] = float(self.toler_threshold_le.text())
+
+        self.configs["obs_start_date"] = list(self.obs_start_date_de.date().getDate())
+        self.configs["start_date"] = list(self.start_date_de.date().getDate())
+        self.configs["calib_start_date"] = list(self.calib_start_date_de.date().getDate())
+        self.configs["end_date"] = list(self.end_date_de.date().getDate())
+
+        self.configs["use_range"] = True if self.calib_range_cb.isChecked() else False
+        self.configs["only_bias"] = True if self.only_bias_cb.isChecked() else False
+
+        params = []
+        for i in range(6):
+            iparam = []
+            for j in range(3):
+                iparam.append(float(self.calib_params_table.item(i, j).text()))
+            params.append(iparam)
+        self.configs["init_params"] = params
+
+        try:
+            result_params = []
+            for i in range(6):
+                result_params. append(float(self.calib_result_table.item(i, 0)))
+            self.configs["result_params"] = result_params
+        except Exception:
+            pass
+
+        self.parent.proj.proj_params["calibrate_configs"] = self.configs
+        self.parent.dirty = True
+        log.info("Configs has been applied.")
+
+    def load_configs(self):
+        if self.parent.proj.proj_params.get("calibrate_configs") is None:
+
+            proj_path = self.parent.proj.proj_params["proj_path"]
+            if proj_path[-1] != "/":
+                proj_path += "/"
+
+            self.configs = OrderedDict()
+            self.configs["params_file"] = proj_path + "params.nc"
+            self.configs["runoff_obs"] = proj_path + "runoff_obs.txt"
+            self.configs["time_scale"] = "M"
+            self.configs["use_range"] = False
+            self.configs["calib_range"] = "None"
+
+            self.configs["BPC"] = 0.5
+            self.configs["turns"] = 2
+            self.configs["max_iterate"] = 20
+            self.configs["toler_threshold"] = 0.005
+            self.configs["only_bias"] = False
+
+            self.configs["obs_start_date"] = [1961, 1, 1]
+            self.configs["start_date"] = [1960, 1, 1]
+            self.configs["calib_start_date"] = [1961, 1, 1]
+            self.configs["end_date"] = [1970, 12, 31]
+
+            self.configs["init_params"] = [[0.1, 0.25, 0.5],
+                                           [0.05, 0.2, 0.35],
+                                           [10, 30, 50],
+                                           [0.75, 0.8, 0.85],
+                                           [0.1, 0.3, 0.6],
+                                           [0.1, 0.3, 0.6]]
+        else:
+            self.configs = self.parent.proj.proj_params["calibrate_configs"]
+
+        self.param_file_le.setText(self.configs["params_file"])
+        self.obs_runoff_file_le.setText(self.configs["runoff_obs"])
+        self.calib_range_le.setText(self.configs["calib_range"])
+
+        self.time_scale_le.setText(self.configs["time_scale"])
+
+        self.bpc_le.setText(unicode(self.configs["BPC"]))
+        self.turns_le.setText(unicode(self.configs["turns"]))
+        self.max_iterate_le.setText(unicode(self.configs["max_iterate"]))
+        self.toler_threshold_le.setText(unicode(self.configs["toler_threshold"]))
+
+        if self.configs["use_range"]:
+            self.calib_range_cb.setCheckState(Qt.Checked)
+        else:
+            self.calib_range_cb.setCheckState(Qt.Unchecked)
+
+        if self.configs["only_bias"]:
+            self.only_bias_cb.setCheckState(Qt.Checked)
+        else:
+            self.only_bias_cb.setCheckState(Qt.Unchecked)
+
+        osdt = self.configs["obs_start_date"]
+        self.obs_start_date_de.setDateTime(dt(osdt[0], osdt[1], osdt[2]))
+        sdt = self.configs["start_date"]
+        self.start_date_de.setDateTime(dt(sdt[0], sdt[1], sdt[2]))
+        csdt = self.configs["calib_start_date"]
+        self.calib_start_date_de.setDateTime(dt(csdt[0], csdt[1], csdt[2]))
+        edt = self.configs["end_date"]
+        self.end_date_de.setDateTime(dt(edt[0], edt[1], edt[2]))
+
+        for i in range(6):
+            for j in range(3):
+                self.calib_params_table.setItem(i, j, QTableWidgetItem(unicode(self.configs["init_params"][i][j])))
+
+        if self.configs.get("result_params") is not None:
+            for i in range(6):
+                self.calib_result_table.setItem(i, 0, QTableWidgetItem(unicode(self.configs["result_params"][i])))
+
+    def create_calib_params(self):
+        vic_run_configs = self.parent.proj.proj_params["vic_run_config"]
+        routing_configs = self.parent.proj.proj_params["routing_config"]
+        proj_path = self.parent.proj.proj_params["proj_path"]
+        if proj_path[-1] != "/":
+            proj_path += "/"
+
+        calib_params = OrderedDict()
+        calib_params["driver_path"] = vic_run_configs["vic_driver_path"]
+        calib_params["global_file"] = proj_path + "global_calibrate.txt"
+        calib_params["params_file"] = unicode(self.param_file_le.text())
+        calib_params["mpi"] = vic_run_configs["with_mpi"]
+        calib_params["ncores"] = vic_run_configs["n_cores"]
+
+        calib_params["start_date"] = list(self.start_date_de.date().getDate())
+        calib_params["end_date"] = list(self.end_date_de.date().getDate())
+        calib_params["calib_start_date"] = list(self.start_date_de.date().getDate())
+
+        calib_params["rout_data_file"] = routing_configs["rout_data_file"]
+        calib_params["domain_file"] = routing_configs["domain_file"]
+        calib_params["vic_out_file"] = ""
+        calib_params["time_scale"] = unicode(self.time_scale_le.text())
+        calib_params["obs_data_file"] = unicode(self.obs_runoff_file_le.text())
+        calib_params["obs_start_date"] = list(self.start_date_de.date().getDate())
+
+        if self.calib_range_cb.isChecked():
+            calib_params["calib_range"] = unicode(self.calib_range_le.text())
+        else:
+            calib_params["calib_range"] = None
+
+        calib_params["BPC"] = float(self.bpc_le.text())
+        calib_params["only_bias"] = True if self.only_bias_cb.isChecked() else False
+        calib_params["turns"] = int(self.turns_le.text())
+        calib_params["max_itr"] = int(self.max_iterate_le.text())
+        calib_params["toler"] = float(self.toler_threshold_le.text())
+
+        p_init = []
+        for i in range(6):
+            iparam = []
+            for j in range(3):
+                iparam.append(float(self.calib_params_table.item(i, j).text()))
+            p_init.append(iparam)
+        calib_params["p_init"] = p_init
+
+        return calib_params
+
+    def run_calibrate(self):
+        rc = self.parent.proj.proj_params.get("routing_config")
+        vc = self.parent.proj.proj_params.get("vic_run_config")
+        if rc is None or vc is None:
+            log.error("VIC run or Routing not set.")
+            return
+        calib_params = self.create_calib_params()
+        results = calibrate(self.parent.proj, calib_params)
+        for i in range(6):
+                self.calib_result_table.setItem(i, 0, QTableWidgetItem(unicode(results[i])))
+
+    def calibrate_start(self):
+        self.calibrate_thread.start()
+
+
+class CalibrateThread(QThread):
+    def __init__(self, parent=None):
+        super(CalibrateThread, self).__init__(parent)
+        self.parent = parent
+
+    def run(self):
+        self.parent.run_calibrate()
 
 
 ########################################################################################################################
@@ -1139,6 +1400,18 @@ class ForcingCreater(QWidget):
         self.vp_data_btn = QPushButton("...")
         self.vp_data_btn.setFixedWidth(36)
 
+        self.swdown_le = QLineEdit()
+        self.swdown_le.setFixedWidth(72)
+        self.lwdown_le = QLineEdit()
+        self.lwdown_le.setFixedWidth(72)
+
+        self.itp_p1_le = QLineEdit()
+        self.itp_p1_le.setFixedWidth(48)
+        self.itp_p2_le = QLineEdit()
+        self.itp_p2_le.setFixedWidth(48)
+        self.itp_p3_le = QLineEdit()
+        self.itp_p3_le.setFixedWidth(48)
+
         self.forcing_start_btn = QPushButton("Start creating")
         self.apply_configs_btn = QPushButton("&Apply configs")
 
@@ -1147,8 +1420,8 @@ class ForcingCreater(QWidget):
         self.forcing_var_table.setHorizontalHeaderLabels([
             "Data path", "Coordinates path", "Variable name", "Type", "ITP p1", "ITP p2", "ITP p3"])
         forcing_header = self.forcing_var_table.horizontalHeader()
-        [forcing_header.setResizeMode(i, QHeaderView.Stretch) for i in range(3)]
-        forcing_header.setResizeMode(3, QHeaderView.Stretch)
+        [forcing_header.setResizeMode(i, QHeaderView.ResizeToContents) for i in range(7)]
+        [forcing_header.setResizeMode(i, QHeaderView.Stretch) for i in range(2)]
 
         forcing_group = QGroupBox()
         forcing_group.setStyleSheet(group_ss)
@@ -1178,17 +1451,25 @@ class ForcingCreater(QWidget):
 
         forcing_layout.addWidget(self.use_sh_cb, 10, 0, 1, 4)
         forcing_layout.addWidget(QLabel("Station coordinates file:"), 11, 0, 1, 2)
-        forcing_layout.addWidget(self.sh_coords_le, 11, 2, 1, 4)
-        forcing_layout.addWidget(self.sh_coords_btn, 11, 6, 1, 1)
+        forcing_layout.addWidget(self.sh_coords_le, 11, 2, 1, 3)
+        forcing_layout.addWidget(self.sh_coords_btn, 11, 5, 1, 1)
         forcing_layout.addWidget(QLabel("Sunshine hours data file:"), 12, 0, 1, 2)
-        forcing_layout.addWidget(self.sh_data_le, 12, 2, 1, 4)
-        forcing_layout.addWidget(self.sh_data_btn, 12, 6, 1, 1)
+        forcing_layout.addWidget(self.sh_data_le, 12, 2, 1, 3)
+        forcing_layout.addWidget(self.sh_data_btn, 12, 5, 1, 1)
         forcing_layout.addWidget(QLabel("Temperature data file:"), 13, 0, 1, 2)
-        forcing_layout.addWidget(self.temp_data_le, 13, 2, 1, 4)
-        forcing_layout.addWidget(self.temp_data_btn, 13, 6, 1, 1)
+        forcing_layout.addWidget(self.temp_data_le, 13, 2, 1, 3)
+        forcing_layout.addWidget(self.temp_data_btn, 13, 5, 1, 1)
         forcing_layout.addWidget(QLabel("VP data file:"), 14, 0, 1, 2)
-        forcing_layout.addWidget(self.vp_data_le, 14, 2, 1, 4)
-        forcing_layout.addWidget(self.vp_data_btn, 14, 6, 1, 1)
+        forcing_layout.addWidget(self.vp_data_le, 14, 2, 1, 3)
+        forcing_layout.addWidget(self.vp_data_btn, 14, 5, 1, 1)
+        forcing_layout.addWidget(QLabel("Shortwave var name:"), 11, 6, 1, 2)
+        forcing_layout.addWidget(self.swdown_le, 11, 8)
+        forcing_layout.addWidget(QLabel("Longwave var name:"), 12, 6, 1, 2)
+        forcing_layout.addWidget(self.lwdown_le, 12, 8)
+        forcing_layout.addWidget(QLabel("Interpolation params:"), 13, 6, 1, 3)
+        forcing_layout.addWidget(self.itp_p1_le, 14, 6)
+        forcing_layout.addWidget(self.itp_p2_le, 14, 7)
+        forcing_layout.addWidget(self.itp_p3_le, 14, 8)
 
         forcing_layout.addWidget(self.apply_configs_btn, 15, 3, 1, 2)
         forcing_layout.addWidget(self.forcing_start_btn, 15, 6, 1, 2)
@@ -1271,17 +1552,20 @@ class ForcingCreater(QWidget):
             proj_path = self.parent.proj.proj_params["proj_path"]
             if proj_path[-1] != "/":
                 proj_path += "/"
-            self.configs["forc_out_path"] = proj_path + "data"
+            self.configs["forc_out_path"] = proj_path + "forcing"
             self.configs["domain_file"] = proj_path + "domain.nc"
             self.configs["start_time"] = [1960, 1, 1]
             self.configs["end_time"] = [1970, 12, 31]
 
             self.configs["use_sh"] = False
 
-            self.configs["sh_coords"] = proj_path + "/sh_coords.txt"
-            self.configs["sh_data"] = proj_path + "/sh_data.txt"
-            self.configs["temp_data"] = proj_path + "/temp_data.txt"
-            self.configs["vp_data"] = proj_path + "/vp_data.txt"
+            self.configs["sh_coords"] = proj_path + "sh_coords.txt"
+            self.configs["sh_data"] = proj_path + "sh_data.txt"
+            self.configs["temp_data"] = proj_path + "temp_data.txt"
+            self.configs["vp_data"] = proj_path + "vp_data.txt"
+            self.configs["sw_varname"] = "swdown"
+            self.configs["lw_varname"] = "lwdown"
+            self.configs["wave_itp_params"] = [2.0, 6.0, 6]
 
             self.configs["forcing_vars"] = []
 
@@ -1307,6 +1591,11 @@ class ForcingCreater(QWidget):
         self.sh_data_le.setText(self.configs["sh_data"])
         self.temp_data_le.setText(self.configs["temp_data"])
         self.vp_data_le.setText(self.configs["vp_data"])
+        self.swdown_le.setText(self.configs["sw_varname"])
+        self.lwdown_le.setText(self.configs["lw_varname"])
+        self.itp_p1_le.setText(unicode(self.configs["wave_itp_params"][0]))
+        self.itp_p2_le.setText(unicode(self.configs["wave_itp_params"][1]))
+        self.itp_p3_le.setText(unicode(self.configs["wave_itp_params"][2]))
 
         forcing_vars = self.configs["forcing_vars"]
         self.forcing_var_table.setRowCount(len(forcing_vars))
@@ -1332,6 +1621,13 @@ class ForcingCreater(QWidget):
         self.configs["sh_data"] = unicode(self.sh_data_le.text())
         self.configs["temp_data"] = unicode(self.temp_data_le.text())
         self.configs["vp_data"] = unicode(self.vp_data_le.text())
+
+        self.configs["sw_varname"] = unicode(self.swdown_le.text())
+        self.configs["lw_varname"] = unicode(self.lwdown_le.text())
+
+        self.configs["wave_itp_params"] = [float(self.itp_p1_le.text()),
+                                           float(self.itp_p2_le.text()),
+                                           float(self.itp_p3_le.text()),]
 
         vars = []
         for i in range(self.forcing_var_table.rowCount()):
@@ -1394,8 +1690,11 @@ class ForcingCreater(QWidget):
                                         unicode(self.sh_data_le.text()),
                                         unicode(self.temp_data_le.text()),
                                         unicode(self.vp_data_le.text()),
-                                        "swdown",
-                                        "lwdown"]
+                                        unicode(self.swdown_le.text()),
+                                        unicode(self.lwdown_le.text()),
+                                        float(self.itp_p1_le.text()),
+                                        float(self.itp_p2_le.text()),
+                                        float(self.itp_p3_le.text()),]
         else:
             forcing_params["use_sh"] = None
 
@@ -1437,10 +1736,7 @@ class ForcingCreateThread(QThread):
         self.parent = parent
 
     def run(self):
-        if self.parent.create_forcing:
-            self.parent.create_forcing_file()
-        else:
-            self.parent.create_parameters_file()
+        self.parent.create_forcing_file()
 
 
 ########################################################################################################################
@@ -1584,10 +1880,19 @@ class ParamsCreater(QWidget):
             self.configs = OrderedDict()
 
             proj_path = self.parent.proj.proj_params["proj_path"]
-            self.configs["soil"] = proj_path + "/soil_params.txt"
-            self.configs["veg"] = proj_path + "/veg_params.txt"
-            self.configs["veg_lib"] = proj_path + "/veg_lib.LDAS"
+            if proj_path[-1] != "/":
+                proj_path += "/"
+            self.configs["soil"] = proj_path + "soil_params.txt"
+            self.configs["veg"] = proj_path + "veg_params.txt"
+            self.configs["veg_lib"] = proj_path + "veglib.LDAS"
+            self.configs["fract"] = "None"
             self.configs["out_path"] = proj_path
+
+            self.configs["layers"] = 3
+            self.configs["snow_bands"] = 1
+            self.configs["rootzones"] = 3
+            self.configs["veg_class"] = 12
+            self.configs["dev"] = 6
 
             self.configs["organic"] = False
             self.configs["treeline"] = False
@@ -1601,11 +1906,11 @@ class ParamsCreater(QWidget):
         self.params_out_path_le.setText(self.configs["out_path"])
         self.fract_file_le.setText(self.configs["fract"])
 
-        self.layers_le.setText(self.configs["layers"])
-        self.snow_bands_le.setText(self.configs["snow_bands"])
-        self.rootzones_le.setText(self.configs["rootzones"])
-        self.veg_class_le.setText(self.configs["veg_class"])
-        self.dec_le.setText(self.configs["dev"])
+        self.layers_le.setText(unicode(self.configs["layers"]))
+        self.snow_bands_le.setText(unicode(self.configs["snow_bands"]))
+        self.rootzones_le.setText(unicode(self.configs["rootzones"]))
+        self.veg_class_le.setText(unicode(self.configs["veg_class"]))
+        self.dec_le.setText(unicode(self.configs["dev"]))
 
         if self.configs["organic"]:
             self.organic_cb.setChecked(Qt.Checked)

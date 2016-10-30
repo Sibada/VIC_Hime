@@ -95,6 +95,8 @@ def read_stn_data(forcing_params):
         sw_var_name = use_sh[4]
         lw_var_name = use_sh[5]
 
+        itp_params = [use_sh[6], use_sh[7], use_sh[8]]
+
         # TODO: Check if those before is empty string.
         coords = np.array(pd.read_table(coords_path, sep=r"[\s,;]", header=None))
         sh = np.array(pd.read_table(sh_path, sep=r"[\s,;]", header=None))
@@ -132,13 +134,15 @@ def read_stn_data(forcing_params):
             "data": swdown,
             "coords": coords,
             "var_name": sw_var_name,
-            "type": "SWDOWN"
+            "type": "SWDOWN",
+            "itp_params": itp_params
         })
         lwdown_var = OrderedDict({
             "data": lwdown,
             "coords": coords,
             "var_name": lw_var_name,
-            "type": "LWDOWN"
+            "type": "LWDOWN",
+            "itp_params": itp_params
         })
         var_data.append(swdown_var)
         var_data.append(lwdown_var)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from Hime import log
 from Hime.ascii_grid import Grid
 from Hime import templates_path
 from Hime.utils import xy_to_sn
@@ -45,7 +46,7 @@ def next_cell(direc, arc_dir_code=False):
               8: -1,
               16: 0,
               32: 1}
-        print "Use ArcInfo direction code."
+        log.info("Use ArcInfo direction code.")
     else:
         dx = {1: 0,
               2: 1,
@@ -63,7 +64,7 @@ def next_cell(direc, arc_dir_code=False):
               6: -1,
               7: 0,
               8: 1}
-        print "Use default direction code."
+        log.info("Use default direction code.")
 
     next_x = direc.value.copy()
     next_y = direc.value.copy()
@@ -92,8 +93,8 @@ def next_cell(direc, arc_dir_code=False):
 #
 ########################################################################################################################
 def discovery_basin(station, next_x, next_y):
-    stn_x = station["x"] - 1
-    stn_y = station["y"] - 1
+    stn_x = station["x"]
+    stn_y = station["y"]
 
     nrow = next_x.shape[0]
     ncol = next_x.shape[1]
@@ -113,7 +114,7 @@ def discovery_basin(station, next_x, next_y):
             while True:
                 # Detect circle.
                 if [ix, iy] in prev_xy:
-                    print "Warning: circle detected at grid cell (%d, %d). This cell will set to 0." % (ix, iy)
+                    log.warn("circle detected at grid cell (%d, %d). This cell will set to 0." % (ix, iy))
                     next_x[iy, ix] = 0
                     next_y[iy, ix] = 0
                     break
@@ -135,7 +136,7 @@ def discovery_basin(station, next_x, next_y):
                 ix, iy = next_x[iy, ix], next_y[iy, ix]
 
     basin = np.array(basin)
-    print "%d cells in this basin." % len(basin)
+    log.info("%d cells in this basin." % len(basin))
     return basin
 
 
@@ -212,7 +213,7 @@ def create_uh_cell(basin, station, uh_m, next_x, next_y, uh_slope):
 
         # Log when complete 10 percent.
         if i % (len(basin)/10) == 0:
-            print "Cell %d dealed." % i
+            log.info("Cell %d dealed." % i)
 
     return uh_cell
 
@@ -233,6 +234,7 @@ def create_uh_cell(basin, station, uh_m, next_x, next_y, uh_slope):
 #
 ########################################################################################################################
 def create_rout(rout_info):
+    log.info("Start to create unit hydrology data.")
     direc = read_direc(rout_info["direc"])
     station = rout_info["station"]
 
@@ -262,6 +264,7 @@ def create_rout(rout_info):
     rout_data["sn"] = sn
     rout_data["uh_cell"] = uh_cell
 
+    log.info("Unit hydrology data has been created.")
     return rout_data
 
 

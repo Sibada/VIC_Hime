@@ -20,6 +20,6 @@ def vic_exec(driver_path, global_path, mpi=False, n_cores=4):
     spc = sp.Popen(sh, stdout=sp.PIPE, stderr=sp.PIPE)
     status = spc.wait()
     logs = spc.stdout.readlines()
-    logs.append(spc.stderr.readlines())
-    return status, logs
+    logs_err = spc.stderr.readlines()
+    return status, logs, logs_err
 

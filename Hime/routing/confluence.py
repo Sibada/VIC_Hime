@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from Hime import log
 from Hime.ascii_grid import Grid
 from Hime import templates_path
 from collections import OrderedDict
@@ -33,7 +34,7 @@ def write_rout_data(rout_data, out_file):
 
     df.writelines(["\n", "\n"])  # Write a new empty line for reading by R.
     df.close()
-    print "Rout data has been write to file %s" % out_file
+    log.info("Rout data has been write to file %s" % out_file)
 
 
 ########################################################################################################################
@@ -44,7 +45,7 @@ def write_rout_data(rout_data, out_file):
 #
 ########################################################################################################################
 def convolution(uh_cell, runoff_yield):
-    print "Making convolution..."
+    # log.info("Making convolution...")
     pre = np.dot(runoff_yield, uh_cell)
     nrow = pre.shape[0]
 
@@ -65,7 +66,7 @@ def confluence(vic_out_file, rout_data, domain_file, start_date, end_date):
     basin = rout_data["basin"]
     uh_cell = rout_data["uh_cell"]
 
-    print "Read data from %s" % vic_out_file
+    # log.info("Read data from %s" % vic_out_file)
     vf = nc.Dataset(vic_out_file, "r")
     # TODO: Detect if it have variable names time, OUT_BASEFLOW and OUT_RUNOFF.
 
@@ -117,5 +118,5 @@ def gather_to_month(daily_runoff):
 ########################################################################################################################
 def write_runoff_data(runoff_data, out_file):
     runoff_data.to_csv(out_file, sep="\t")
-    print "File %s has been write." % out_file
+    log.info("Streamflow data file %s has been write." % out_file)
 

@@ -84,7 +84,7 @@ class VicProj(object):
         glo_prm["compute_treeline"] = "FALSE"
         glo_prm["veglib_vegcover"] = "FALSE"
         # Domain file.
-        glo_prm["domain_path"] = None
+        glo_prm["domain_file"] = None
         domain_type = OrderedDict({
             "LAT": "lat",
             "LON": "lon",
@@ -185,7 +185,7 @@ class VicProj(object):
         out_lines.append("#######################################################################")
         out_lines.append("# DOMAIN INFO")
         out_lines.append("#######################################################################")
-        out_lines.append("DOMAIN %s" % glo_prm["domain_path"])
+        out_lines.append("DOMAIN %s" % glo_prm["domain_file"])
         for tp in glo_prm["domain_type"].items():
             out_lines.append("DOMAIN_TYPE %s %s" % (tp[0], tp[1]))
         out_lines.append("")
@@ -340,11 +340,11 @@ class VicProj(object):
     def set_result_path(self, result_path):
         self.global_params["out_path"] = result_path
 
-    def set_start_time(self, y, m, d):
-        self.global_params["start_time"] = datetime.datetime(y, m, d)
+    def set_start_time(self, ymd):
+        self.global_params["start_time"] = datetime.datetime(ymd[0], ymd[1], ymd[2])
 
-    def set_end_time(self, y, m, d):
-        self.global_params["end_time"] = datetime.datetime(y, m, d)
+    def set_end_time(self, ymd):
+        self.global_params["end_time"] = datetime.datetime(ymd[0], ymd[1], ymd[2])
 
     ###########################################################################
     # forcing must be a dict like that:

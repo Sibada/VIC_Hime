@@ -58,17 +58,18 @@ class MainWindow(QMainWindow):
         #######################################################################
         tabs = QTabWidget()
         tabs.setMinimumSize(600, 680)
+        tabs.setMaximumSize(1000, 720)
         tabs.addTab(self.global_config_panel, "Global setting")
         tabs.addTab(self.vic_run_panel, "Run VIC")
         tabs.addTab(self.routing_panel, "Routing")
         tabs.addTab(self.calibrate_panel, "Calibrate")
-        tabs.addTab(self.forcing_create_panel, "Input file create")
-        tabs.addTab(self.params_create_panel, "Input file create")
+        tabs.addTab(self.forcing_create_panel, "Forcing file create")
+        tabs.addTab(self.params_create_panel, "Params file create")
 
         self.log_console = QTextBrowser()
         self.log_console.setMinimumWidth(300)
-        log_cons_lb = QLabel("Log console")
 
+        log_cons_lb = QLabel("Log console")
         log_layout = QVBoxLayout()
         log_layout.addWidget(log_cons_lb)
         log_layout.addWidget(self.log_console)
@@ -113,8 +114,11 @@ class MainWindow(QMainWindow):
 
         current_proj_path = unicode(settings.value("current_project").toString())
         if current_proj_path != "":
-            self.load_proj(current_proj_path)
-            self.current_proj_path = current_proj_path
+            try:
+                self.load_proj(current_proj_path)
+                self.current_proj_path = current_proj_path
+            except Exception:
+                pass
 
     ####################################################################################################################
     #
@@ -208,8 +212,10 @@ class MainWindow(QMainWindow):
 
     def load_configs(self):
         self.current_proj_path = self.proj.proj_params["proj_file"]
+
         self.global_config_panel.load_configs()
         self.vic_run_panel.load_configs()
+        self.calibrate_panel.load_configs()
         self.routing_panel.load_configs()
         self.forcing_create_panel.load_configs()
         self.params_create_panel.load_configs()
