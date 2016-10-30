@@ -259,6 +259,8 @@ def calibrate(proj, calib_configs):
 
             sorted_y = sorted([left_y, median_y, right_y])
             dy = sorted_y[1] - sorted_y[0]
+            pid = [left_y, median_y, right_y].index(sorted_y[0])
+            NMSE, BIAS = step_NMSE[pid], step_BIAS[pid]
 
             itr = 0
             while dy > toler and itr < max_itr:
