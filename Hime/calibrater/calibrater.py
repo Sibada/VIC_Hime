@@ -321,6 +321,10 @@ def calibrate(proj, calib_configs):
                 p_rngs[i, 2] = rcb[i]
 
     log.info("######### calibration completed. #########")
+
+    # Apply optimized parameters to file.
+    [set_params(params_file, calib_range, i, step_params[i]) for i in range(6)]
+
     return step_params
 
 
