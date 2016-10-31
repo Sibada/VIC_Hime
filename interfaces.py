@@ -1006,10 +1006,12 @@ class Routing(QWidget):
         out_dir = unicode(self.rout_out_dir_le.text())
         if out_dir[-1] != "/":
             out_dir += "/"
-        write_runoff_data(runoffs, unicode(self.rout_out_dir_le.text()) +
-                          unicode(self.stn_name_le.text()) + "_daily.txt")
-        write_runoff_data(runoffs_m, unicode(self.rout_out_dir_le.text()) +
-                          unicode(self.stn_name_le.text()) + "_monthly.txt")
+        try:
+            os.makedirs(out_dir)
+        except Exception:
+            pass
+        write_runoff_data(runoffs, out_dir + unicode(self.stn_name_le.text()) + "_daily.txt")
+        write_runoff_data(runoffs_m, out_dir + unicode(self.stn_name_le.text()) + "_monthly.txt")
 
 
 ########################################################################################################################
@@ -1227,7 +1229,7 @@ class Calibrater(QWidget):
             self.configs["use_range"] = False
             self.configs["calib_range"] = "None"
 
-            self.configs["BPC"] = 0.5
+            self.configs["BPC"] = 0.25
             self.configs["turns"] = 2
             self.configs["max_iterate"] = 20
             self.configs["toler_threshold"] = 0.005
@@ -1239,11 +1241,11 @@ class Calibrater(QWidget):
             self.configs["end_date"] = [1970, 12, 31]
 
             self.configs["init_params"] = [[0.1, 0.25, 0.5],
-                                           [0.05, 0.2, 0.35],
-                                           [10, 30, 50],
+                                           [0.01, 0.1, 0.3],
+                                           [10, 40, 70],
                                            [0.75, 0.8, 0.85],
-                                           [0.1, 0.3, 0.6],
-                                           [0.1, 0.3, 0.6]]
+                                           [0.1, 0.3, 0.5],
+                                           [0.1, 0.4, 0.7]]
         else:
             self.configs = self.parent.proj.proj_params["calibrate_configs"]
 

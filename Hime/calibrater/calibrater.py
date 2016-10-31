@@ -52,7 +52,7 @@ import copy
 # Run vic and routing and return a accuracy index of the simulation.
 #
 ########################################################################################################################
-def try_run_vic(calib_params):
+def vic_try(calib_params):
     time_scale = calib_params["time_scale"]
 
     global_file = calib_params["global_file"]
@@ -114,34 +114,28 @@ def try_run_vic(calib_params):
     return e, NMSE, BIAS
 
 
-def set_nc_calib_params(params_file, calib_range, calib_var, value):
-
-    if calib_var == "infilt":
+def set_params(params_file, calib_range, var_id, value):
+    if var_id == 0:
         set_value_nc(params_file, "infilt", value, col_row=calib_range)
-
-    if calib_var == "Ds":
+    if var_id == 1:
         set_value_nc(params_file, "Ds", value, col_row=calib_range)
-
-    if calib_var == "Dsmax":
+    if var_id == 2:
         set_value_nc(params_file, "Dsmax", value, col_row=calib_range)
-
-    if calib_var == "Ws":
+    if var_id == 3:
         set_value_nc(params_file, "Ws", value, col_row=calib_range)
-
-    if calib_var == "d2":
+    if var_id == 4:
         set_soil_depth(params_file, 2, value, col_row=calib_range)
-
-    if calib_var == "d3":
+    if var_id == 5:
         set_soil_depth(params_file, 3, value, col_row=calib_range)
 
 
-def run_adjust(calib_params, calib_var, value):
-    params_file = calib_params["params_file"]
-    calib_range = calib_params["calib_range"]
-    set_nc_calib_params(params_file, calib_range, calib_var, value)
+def vic_try_with_param(calib_configs, var_id, value):
+    params_file = calib_configs["params_file"]
+    calib_range = calib_configs["calib_range"]
+    set_params(params_file, calib_range, var_id, value)
 
-    e, NMSE, BIAS = try_run_vic(calib_params)
-    return e, NMSE, BIAS
+    e, NMSE, BIAS = vic_try(calib_configs)
+    return [e, NMSE, BIAS]
 
 
 ########################################################################################################################
@@ -151,27 +145,31 @@ def run_adjust(calib_params, calib_var, value):
 ########################################################################################################################
 def calibrate(proj, calib_configs):
     params_file = calib_configs["params_file"]
-    rout_data_file = calib_configs["rout_data_file"]
 
     start_date = calib_configs["start_date"]
-    # calib_start_date = calib_configs["calib_start_date"]
     end_date = calib_configs["end_date"]
 
-    p_init = calib_configs["p_init"]
-
-    rout_data = load_rout_data(rout_data_file)
-    calib_configs["rout_data"] = rout_data
-
-    if calib_configs.get("calib_range") is None:
-        calib_range = rout_data["basin"]
-    else:
-        calib_range = np.loadtxt(calib_configs.get["calib_range"], dtype=float, delimiter=r"[/s,]")
-    calib_configs["calib_range"] = calib_range
+    p_rngs = np.array(calib_configs["p_init"])
 
     calib_configs["obs_data"] = np.loadtxt(calib_configs["obs_data_file"])
+    calib_configs["rout_data"] = load_rout_data(calib_configs["rout_data_file"])
+
+    calib_range = calib_configs["rout_data"]["basin"]\
+        if calib_configs.get("calib_range_file") is None \
+        else np.loadtxt(calib_configs.get["calib_range_file"], dtype=int, delimiter=r"[/s,]")
+    calib_configs["calib_range"] = calib_range
+
+    turns = calib_configs["turns"]
+    max_itr = calib_configs["max_itr"]
+    toler = calib_configs["toler"]
+    BPC = calib_configs["BPC"]
+
+    # Set run area.
+    set_value_nc(params_file, "run_cell", 0, all=True)
+    set_value_nc(params_file, "run_cell", 1, col_row=calib_range)
 
     ###########################################################################
-    # Create a single global file.
+    # Create a single global file for calibration.
     ###########################################################################
     proj_calib = copy.deepcopy(proj)
     proj_path = proj_calib.proj_params["proj_path"]
@@ -183,13 +181,13 @@ def calibrate(proj, calib_configs):
 
     proj_calib.global_params["out_path"] = proj_path
     out_file_calib = OrderedDict({
-            "out_file": "for_calibrate",
-            "out_format": "NETCDF4",
-            "compress": "FALSE",
-            "aggfreq": "NDAYS 1",
-            "out_var": ["OUT_RUNOFF",
-                        "OUT_BASEFLOW"]
-        })
+        "out_file": "for_calibrate",
+        "out_format": "NETCDF4",
+        "compress": "FALSE",
+        "aggfreq": "NDAYS 1",
+        "out_var": ["OUT_RUNOFF",
+                    "OUT_BASEFLOW"]
+    })
     proj_calib.global_params["out_file"] = [out_file_calib]
 
     global_file = proj_path + "global_calibrate.txt"
@@ -199,199 +197,138 @@ def calibrate(proj, calib_configs):
 
     calib_configs["global_file"] = global_file
     calib_configs["vic_out_file"] = vic_out_file
+
     ###########################################################################
+    # Presets of auto-calibration.
+    ###########################################################################
+    param_names = ["infilt", "Ds", "Dsmax", "Ws", "d2", "d3"]
 
-    calib_params = ["infilt", "Ds", "Dsmax", "Ws", "d2", "d3"]
-    lob = [0, 0, 0, 0, -1, -1]
-    rob = [1, 1, -1, 1, -1, -1]
-    lcb = [-1, -1, -1, -1, 0.1, 0.1]
-    rcb = [-1, -1, -1, -1, 10, 10]
+    lob = [0, 0, 0, 0, -1, -1]  # Left open boundary, -1 means not boundary.
+    rob = [1, 1, -1, 1, -1, -1]  # Right open boundary.
+    lcb = [-1, -1, -1, -1, 0.1, 0.1]  # Left close boundary. Params can get this value.
+    rcb = [-1, -1, -1, -1, 10, 10]  # Right close boundary.
 
-    opt_site = [1, 1, 1, 1, 1, 1]
+    step_r = None
+    rs = [None, None, None]
+    step_params = p_rngs[:, 1]
 
-    set_value_nc(params_file, "run_cell", 0, all=True)
-    set_value_nc(params_file, "run_cell", 1, col_row=calib_range)
+    log.info("###### Automatical calibration start... ######")
+    log.info("\nTurns:\t%d\nmax itr:\t%d\ntoler:\t%.5f\nBPC:\t%.2f" % (turns, max_itr, toler, BPC))
 
-    p_init = np.array(p_init)
-    set_value_nc(params_file, "infilt", p_init[0, 1], col_row=calib_range)
-    set_value_nc(params_file, "Ds", p_init[1, 1], col_row=calib_range)
-    set_value_nc(params_file, "Dsmax", p_init[2, 1], col_row=calib_range)
-    set_value_nc(params_file, "Ws", p_init[3, 1], col_row=calib_range)
-    set_soil_depth(params_file, 2, p_init[4, 1], col_row=calib_range)
-    set_soil_depth(params_file, 3, p_init[5, 1], col_row=calib_range)
+    for t in range(turns):
+        turn = t + 1
+        log.info("Turns %d:" % turn)
+        for p in range(6):
+            param_name = param_names[p]
+            log.info("Calibrate %s:" % param_name)
 
-    turns = calib_configs["turns"]
-    max_itr = calib_configs["max_itr"]
-    toler = calib_configs["toler"]
-    BPC = calib_configs["BPC"]
+            [set_params(params_file, calib_range, i, step_params[i]) for i in range(6)]
 
-    log.info("Turns: %d, max itr: %d, toler: %.5f, BPC: %.2f" % (turns, max_itr, toler, BPC))
+            x = list(p_rngs[p, :])
+            rs[0] = vic_try_with_param(calib_configs, p, x[0])
+            rs[2] = vic_try_with_param(calib_configs, p, x[2])
 
-    step_E = None
-    step_NMSE = [0, 0, 0]
-    step_BIAS = [0, 0, 0]
-
-    log.info("Calibrating start.")
-    for turn in range(turns):
-        log.info("Turns %d" % (turn+1))
-        for calib_param in calib_params:
-            log.info("Calibrate %s" % calib_param)
-            pid = calib_params.index(calib_param)
-
-            left_x = p_init[pid, 0]
-            median_x = p_init[pid, 1]
-            right_x = p_init[pid, 2]
-
-            if step_E is not None and opt_site[pid] == 0:
-                left_y = step_E
+            if step_r is not None:
+                rs[1] = step_r
             else:
-                left_y, step_NMSE[0], step_BIAS[0] = run_adjust(calib_configs, calib_param, left_x)
+                rs[1] = vic_try_with_param(calib_configs, p, x[1])
 
-            if step_E is not None and opt_site[pid] == 1:
-                median_y = step_E
-            else:
-                median_y, step_NMSE[1], step_BIAS[1] = run_adjust(calib_configs, calib_param, median_x)
+            od = order(rs)  # Order of the results sorted by optimise level. The od[0]'s is the optimized.
+            es, NMSEs, BIASs = [r[0] for r in rs], [r[1] for r in rs], [r[2] for r in rs]
+            opt_E = es[od[0]]
+            opt_val = x[od[0]]
+            NMSE = NMSEs[od[0]]
+            BIAS = BIASs[od[0]]
 
-            if step_E is not None and opt_site[pid] == 2:
-                right_y = step_E
-            else:
-                right_y, step_NMSE[2], step_BIAS[2] = run_adjust(calib_configs, calib_param, right_x)
+            step_params[p] = opt_val
 
-            sorted_y = sorted([left_y, median_y, right_y])
-            dy = sorted_y[1] - sorted_y[0]
-            pid = [left_y, median_y, right_y].index(sorted_y[0])
-            NMSE, BIAS = step_NMSE[pid], step_BIAS[pid]
+            step_r = rs[od[0]]
+            de = es[od[2]] - es[od[0]]
 
-            itr = 0
-            while dy > toler and itr < max_itr:
-                log.debug("Calibrate %s, (x,y)1 = (%.3f, %.3f), (x,y)2 = (%.3f, %.3f), (x,y)3 = (%.3f, %.3f)"
-                          % (calib_param, left_x, left_y, median_x, median_y, right_x, right_y))
-                if median_y < left_y and median_y < right_y:
-                    left_x = (left_x + median_x) / 2
-                    right_x = (right_x + median_x) / 2
+            itr = 0  # Iteration times of single parameter.
+            while de >= toler:
+                if itr > max_itr:
+                    break
 
-                    left_y, step_NMSE[0], step_BIAS[0] = run_adjust(calib_configs, calib_param, left_x)
-                    right_y, step_NMSE[2], step_BIAS[2] = run_adjust(calib_configs, calib_param, right_x)
+                if es[1] < es[0] and es[1] < es[2]:
+                    x[0] = (x[0] + x[1])/2
+                    x[2] = (x[1] + x[2])/2
+                    rs[0] = vic_try_with_param(calib_configs, p, x[0])
+                    rs[2] = vic_try_with_param(calib_configs, p, x[2])
 
-                elif left_y < median_y < right_y:
-                    if lcb[pid] != -1 and left_x == lcb[pid]:
+                elif es[0] < es[1] < es[2]:
+                    if lcb[p] < 0 and x[0] == lcb[p]:
                         break
 
-                    left_x_o = left_x
-                    left_x -= (right_x - left_x) / 2
+                    x[2], x[1], x[0] = x[1], x[0], x[0]-(x[2]-x[0])/2
+                    rs[2], rs[1] = rs[1], rs[0]
 
-                    if lcb[pid] != -1 and left_x < lcb[pid]:
-                        left_x = lcb[pid]
-                        right_x = median_x
-                        median_x = left_x_o
+                    if lcb[p] > 0 and x[0] < lcb[p]:
+                        x[0] = lcb[p]
+                    elif lob[p] > 0 and x[0] <= lob[p]:
+                        x[0] = x[1] - 0.618 * (x[1]-lob)
 
-                        right_y = median_y
-                        median_y = left_y
-                        step_NMSE[2] = step_NMSE[1]
-                        step_NMSE[1] = step_NMSE[0]
-                        step_BIAS[2] = step_BIAS[1]
-                        step_BIAS[1] = step_BIAS[0]
-                        left_y, step_NMSE[0], step_BIAS[0] = run_adjust(calib_configs, calib_param, left_x)
+                    rs[0] = vic_try_with_param(calib_configs, p, x[0])
 
-                    elif lob[pid] != -1 and left_x <= lob[pid]:
-                        left_x = (lob[pid] + left_x_o) / 2
-                        right_x = median_x
-                        median_x = left_x_o
-
-                        right_y = median_y
-                        median_y = left_y
-                        step_NMSE[2] = step_NMSE[1]
-                        step_NMSE[1] = step_NMSE[0]
-                        step_BIAS[2] = step_BIAS[1]
-                        step_BIAS[1] = step_BIAS[0]
-                        left_y, step_NMSE[0], step_BIAS[0] = run_adjust(calib_configs, calib_param, left_x)
-
-                    else:
-                        right_x = median_x
-                        median_x = left_x_o
-
-                        right_y = median_y
-                        median_y = left_y
-                        step_NMSE[2] = step_NMSE[1]
-                        step_NMSE[1] = step_NMSE[0]
-                        step_BIAS[2] = step_BIAS[1]
-                        step_BIAS[1] = step_BIAS[0]
-                        left_y, step_NMSE[0], step_BIAS[0] = run_adjust(calib_configs, calib_param, left_x)
-
-                elif left_y > median_y > right_y:
-                    if rcb[pid] != -1 and right_x == rcb[pid]:
+                elif es[0] > es[1] > es[2]:
+                    if rcb[p] > 0 and x[2] == rcb[p]:
                         break
 
-                    right_x_o = right_x
-                    right_x += (right_x - left_x) / 2
+                    x[0], x[1], x[2] = x[1], x[2], x[2]+(x[2]-x[0])/2
+                    rs[0], rs[1] = rs[1], rs[2]
 
-                    if rcb[pid] != -1 and right_x > rcb[pid]:
-                        right_x = rcb[pid]
-                        left_x = median_x
-                        median_x = right_x_o
+                    if x[2] > rcb[p] > 0:
+                        x[2] = lcb[p]
+                    elif x[2] >= rob[p] > 0:
+                        x[2] = x[1] + 0.618 * (rob[p]-x[1])
 
-                        left_y = median_y
-                        median_y = right_y
-                        step_NMSE[0] = step_NMSE[1]
-                        step_NMSE[1] = step_NMSE[2]
-                        step_BIAS[0] = step_BIAS[1]
-                        step_BIAS[1] = step_BIAS[2]
-                        right_y, step_NMSE[2], step_BIAS[2] = run_adjust(calib_configs, calib_param, right_x)
+                    rs[2] = vic_try_with_param(calib_configs, p, x[2])
 
-                    elif rob[pid] != -1 and right_x >= rob[pid]:
-                        right_x = (rob[pid] + right_x_o) / 2
-                        left_x = median_x
-                        median_x = right_x_o
+                es, NMSEs, BIASs = [r[0] for r in rs], [r[1] for r in rs], [r[2] for r in rs]
 
-                        left_y = median_y
-                        median_y = right_y
-                        step_NMSE[0] = step_NMSE[1]
-                        step_NMSE[1] = step_NMSE[2]
-                        step_BIAS[0] = step_BIAS[1]
-                        step_BIAS[1] = step_BIAS[2]
-                        right_y, step_NMSE[2], step_BIAS[2] = run_adjust(calib_configs, calib_param, right_x)
+                od = order(rs)
+                opt_E = es[od[0]]
+                opt_val = x[od[0]]
+                NMSE = NMSEs[od[0]]
+                BIAS = BIASs[od[0]]
 
-                    else:
-                        left_x = median_x
-                        median_x = right_x_o
-
-                        left_y = median_y
-                        median_y = right_y
-                        step_NMSE[0] = step_NMSE[1]
-                        step_NMSE[1] = step_NMSE[2]
-                        step_BIAS[0] = step_BIAS[1]
-                        step_BIAS[1] = step_BIAS[2]
-                        right_y, step_NMSE[2], step_BIAS[2] = run_adjust(calib_configs, calib_param, right_x)
-
-                p_init[pid, :] = [left_x, median_x, right_x]
-
-                if median_y < left_y and median_y < right_y:
-                    step_E = median_y
-                    opt_site[pid] = 1
-                elif left_y < median_y < right_y:
-                    step_E = left_y
-                    opt_site[pid] = 0
-                elif left_y > median_y > right_y:
-                    step_E = right_y
-                    opt_site[pid] = 2
-
-                sorted_y = sorted([left_y, median_y, right_y])
-                dy = sorted_y[1] - sorted_y[0]
-
-                NMSE, BIAS = step_NMSE[opt_site[pid]], step_BIAS[opt_site[pid]]
-
+                step_params[p] = opt_val
+                step_r = rs[od[0]]
+                de = es[od[2]] - es[od[0]]
                 itr += 1
-                log.info("%s iteration %d, value = %.3f, E = %.3f, NSCE = %.3f, BIAS = %.3f" %
-                         (calib_param, itr, p_init[pid, opt_site[pid]], step_E, 1 - NMSE, BIAS))
 
-            log.info("%s calibrated, value = %.3f, E = %.3f, NSCE = %.3f, BIAS = %.3f" %
-                     (calib_param, p_init[pid, opt_site[pid]], step_E, 1 - NMSE, BIAS))
+                log.info("Iteration %d: param value=%.3f, E=%.3f, NSCE=%.3f, BIAS=%.3f" %
+                         (itr, opt_val, opt_E, 1-NMSE, BIAS))
+                log.debug("[%.3f, %.3f, %.3f, %.3f, %.3f, %.3f] => VIC => E:%.3f, NMSE:%.3f, BIAS:%.3f"
+                          % (step_params[0], step_params[1], step_params[2], step_params[3],
+                             step_params[4], step_params[5], opt_E, NMSE, BIAS))
 
-        log.info("Calibrate result of turns %d:  Infilt: %.3f, Ds: %.3f, Dsmax: %.3f, Ws: %.3f,"
-                 " d2: %.3f, d3: %.3f, E: %.3f, NSC: %.3f, BIAS: %.3f"
-                 % (turn+1, p_init[0, opt_site[0]], p_init[1, opt_site[1]], p_init[2, opt_site[2]],
-                    p_init[3, opt_site[3]], p_init[4, opt_site[4]], p_init[5, opt_site[5]],
-                    step_E, 1-NMSE, BIAS))
+            log.info("Parameter %s calibrated. Optimized value: %.3f, E: %.3f, NSCE: %.3f, BIAS: %.3f" %
+                     (param_name, opt_val, opt_E, 1-NMSE, BIAS))
 
-    return [p_init[0, opt_site[0]], p_init[1, opt_site[1]], p_init[2, opt_site[2]],
-            p_init[3, opt_site[3]], p_init[4, opt_site[4]], p_init[5, opt_site[5]]]
+        # Reset range.
+        n_rngs = (p_rngs[:, 2] - p_rngs[:, 0]) / 2 * 0.618
+        p_rngs[:, 1] = step_params
+        p_rngs[:, 0], p_rngs[:, 2] = step_params - n_rngs, step_params + n_rngs
+        for i in range(6):
+            if lob[i] > 0 and p_rngs[i, 0] <= lob[i]:
+                p_rngs[i, 0] = step_params[i] - (step_params[i] - lob[i]) * 0.618
+            if not rob[i] <= 0 and p_rngs[i, 2] >= rob[i]:
+                p_rngs[i, 2] = step_params[i] + (rob[i] - step_params[i]) * 0.618
+            if lcb[i] > 0 and p_rngs[i, 0] < lcb[i]:
+                p_rngs[i, 0] = lcb[i]
+            if not rcb[i] <= 0 and p_rngs[i, 2] > rcb[i]:
+                p_rngs[i, 2] = rcb[i]
+
+    log.info("######### calibration completed. #########")
+    return step_params
+
+
+########################################################################################################################
+#
+# Take the orders of an array like in R.
+#
+########################################################################################################################
+def order(array):
+    return list(pd.DataFrame(array).sort(0).index)
+

@@ -105,12 +105,12 @@ class MainWindow(QMainWindow):
         QTextCodec.setCodecForCStrings(QTextCodec.codecForName("utf-8"))
 
         box_log = logging.StreamHandler(StreamEmitter(text_written=self.output_writen))
+        box_log.setLevel(logging.INFO)
         box_log.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s',
                                                datefmt='%Y-%m-%d %H:%M:%S'))
         log.addHandler(box_log)
 
         self.current_proj_path = None
-
 
         current_proj_path = unicode(settings.value("current_project").toString())
         if current_proj_path != "":
@@ -254,7 +254,6 @@ class MainWindow(QMainWindow):
 
 
 class CreateProjDialog(QDialog):
-
     def __init__(self, parent=None):
         super(CreateProjDialog, self).__init__(parent)
 
@@ -293,10 +292,9 @@ class CreateProjDialog(QDialog):
 
 
 class StreamEmitter(QObject):
-        text_written = pyqtSignal(str)
-
-        def write(self, text):
-            self.text_written.emit(str(text))
+    text_written = pyqtSignal(str)
+    def write(self, text):
+        self.text_written.emit(str(text))
 
 def main():
     app = QApplication(sys.argv)
