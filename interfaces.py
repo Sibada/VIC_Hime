@@ -34,32 +34,6 @@ class GlobalConfig(QWidget):
     def __init__(self, parent=None):
         super(GlobalConfig, self).__init__(parent)
         self.parent = parent
-        #######################################################################
-        # Sys config group
-        #######################################################################
-        self.vic_driver_le = QLineEdit()
-        self.vic_driver_le.setMinimumWidth(128)
-
-        self.cores_le = QLineEdit()
-        self.cores_le.setFixedWidth(36)
-
-        self.vic_driver_btn = QPushButton("...")
-        self.vic_driver_btn.setFixedWidth(36)
-
-        sys_group = QGroupBox()
-        sys_group.setStyleSheet(group_ss)
-        sys_group.setTitle("System")
-        sys_group.setMinimumWidth(420)
-
-        sys_layout = QHBoxLayout()
-        sys_group.setLayout(sys_layout)
-
-        sys_layout.addWidget(QLabel("VIC driver path:"))
-        sys_layout.addWidget(self.vic_driver_le)
-        sys_layout.addWidget(self.vic_driver_btn)
-        sys_layout.addStretch(1)
-        sys_layout.addWidget(QLabel("Cores:"))
-        sys_layout.addWidget(self.cores_le)
 
         #######################################################################
         # Global config group
@@ -230,11 +204,11 @@ class GlobalConfig(QWidget):
         # Bottom buttons
         #######################################################################
         self.global_path_le = QLineEdit()
-        self.global_path_le.setMinimumWidth(240)
+        self.global_path_le.setMinimumWidth(360)
         self.global_path_btn = QPushButton("...")
         self.global_path_btn.setFixedWidth(36)
 
-        self.save_btn = QPushButton("&Save settings")
+        self.apply_configs_btn = QPushButton("&Apply configs")
         self.create_global_btn = QPushButton("&Create global file")
 
         button_layout = QHBoxLayout()
@@ -243,7 +217,7 @@ class GlobalConfig(QWidget):
         button_layout.addWidget(self.global_path_le)
         button_layout.addWidget(self.global_path_btn)
         button_layout.addStretch(1)
-        button_layout.addWidget(self.save_btn)
+        button_layout.addWidget(self.apply_configs_btn)
         button_layout.addWidget(self.create_global_btn)
 
         #######################################################################
@@ -254,7 +228,6 @@ class GlobalConfig(QWidget):
         left_layout = QVBoxLayout()
         right_layout = QVBoxLayout()
 
-        left_layout.addWidget(sys_group)
         left_layout.addWidget(global_group)
         left_layout.addStretch(1)
         right_layout.addWidget(forcings_group)
@@ -269,9 +242,6 @@ class GlobalConfig(QWidget):
         #######################################################################
         # Actions of file dialogs (Setting path).
         #######################################################################
-        self.connect(self.vic_driver_btn, SIGNAL("clicked()"),
-                     lambda: self.set_file_by_dialog(line_edit=self.vic_driver_le, disc="Set VIC driver path"))
-
         self.connect(self.param_path_btn, SIGNAL("clicked()"),
                      lambda: self.set_file_by_dialog(line_edit=self.param_path_le, disc="Set parameters file path"))
 
@@ -289,7 +259,7 @@ class GlobalConfig(QWidget):
         #######################################################################
         # Saving, writing global file, and others.
         #######################################################################
-        self.connect(self.save_btn, SIGNAL("clicked()"), self.save_setting)
+        self.connect(self.apply_configs_btn, SIGNAL("clicked()"), self.apply_configs)
 
         self.connect(self.create_global_btn, SIGNAL("clicked()"), self.write_global_file)
 
@@ -302,15 +272,12 @@ class GlobalConfig(QWidget):
         #######################################################################
         # Parameters
         #######################################################################
-        # TODO
 
     def load_configs(self):
         proj_params = self.parent.proj.proj_params
         global_params = self.parent.proj.global_params
-        self.vic_driver_le.setText(unicode(proj_params["vic_image_driver"]))
-        self.cores_le.setText(unicode(proj_params["n_cores"]))
-        self.global_path_le.setText(unicode(proj_params["global_file"]))
 
+        self.global_path_le.setText(unicode(proj_params["global_file"]))
         self.start_time_de.setDateTime(global_params["start_time"])
         self.end_time_de.setDateTime(global_params["end_time"])
 
@@ -398,8 +365,7 @@ class GlobalConfig(QWidget):
     def apply_configs(self):
         proj_params = self.parent.proj.proj_params
         global_params = self.parent.proj.global_params
-        proj_params["vic_image_driver"] = unicode(self.vic_driver_le.text())
-        proj_params["n_cores"] = unicode(self.cores_le.text())
+
         proj_params["global_file"] = unicode(self.global_path_le.text())
 
         global_params["start_time"] = self.start_time_de.dateTime().toPyDateTime()
@@ -457,9 +423,8 @@ class GlobalConfig(QWidget):
 
             current_info["out_var"].append(out_var)
 
-    def save_setting(self):
-        self.apply_configs()
-        self.parent.save_proj()
+        self.parent.dirty = True
+        log.info("Configs has been applied.")
 
     def set_file_by_dialog(self, line_edit, disc):
         file = QFileDialog.getOpenFileName(self, disc)
@@ -638,17 +603,32 @@ class VicRun(QWidget):
         self.parent.vic_run_console.ensureCursorVisible()
 
     def run_vic(self):
+        # If you want to routing after run vic you should configure the routing options.
         if self.rout_cb.isChecked() and self.parent.proj.proj_params.get("routing_config") is None:
             log.error("Routing configs was not set. Can not run with routing.")
             return
+
+        log.info("VIC start to run...")
+        self.vic_running = True
 
         vic_path = unicode(self.vic_driver_le.text())
         n_cores = unicode(self.cores_le.text())
         use_mpi = True if self.mpi_cb.isChecked() else False
 
-        status, logs = vic_exec(vic_path, unicode(self.global_file_le.text()), mpi=use_mpi, n_cores=n_cores)
-        for line in logs:
-            self.vic_run_console.setText(unicode(line))
+        # Execute VIC image driver.
+        global_file = unicode(self.global_file_le.text())
+        status, logs_out, logs_err = vic_exec(vic_path, global_file, mpi=use_mpi, n_cores=n_cores)
+
+        vic_logs = []
+        for line in logs_out:
+            vic_logs.append(line)
+        for line in logs_err:
+            vic_logs.append(line)
+
+        cursor = self.vic_run_console.textCursor()
+        [cursor.insertText(line) for line in vic_logs]
+
+        self.parent.vic_running = False
 
         if status != 0:
             log.error("Error in VIC running.")
@@ -660,17 +640,7 @@ class VicRun(QWidget):
         log.info("Routing complete.")
 
     def start_vic(self):
-        log.info("VIC start to run...")
-        self.vic_running = True
-        sys.stdout = StreamEmitter(text_written=self.output_writen)
-        sys.stderr = StreamEmitter(text_written=self.output_writen)
-
         self.vic_run_thread.start()
-
-        self.parent.vic_running = False
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-        log.info("VIC run completed.")
 
     def apply_configs(self):
         self.configs["vic_driver_path"] = unicode(self.vic_driver_le.text())
@@ -1206,7 +1176,7 @@ class Calibrater(QWidget):
         try:
             result_params = []
             for i in range(6):
-                result_params. append(float(self.calib_result_table.item(i, 0)))
+                result_params. append(float(self.calib_result_table.item(i, 0).text()))
             self.configs["result_params"] = result_params
         except Exception:
             pass
@@ -1287,41 +1257,46 @@ class Calibrater(QWidget):
             for i in range(6):
                 self.calib_result_table.setItem(i, 0, QTableWidgetItem(unicode(self.configs["result_params"][i])))
 
-    def create_calib_params(self):
+    ####################################################################################################################
+    #
+    # Create a dict include configures of calibration.
+    #
+    ####################################################################################################################
+    def create_calib_configs(self):
         vic_run_configs = self.parent.proj.proj_params["vic_run_config"]
         routing_configs = self.parent.proj.proj_params["routing_config"]
         proj_path = self.parent.proj.proj_params["proj_path"]
         if proj_path[-1] != "/":
             proj_path += "/"
 
-        calib_params = OrderedDict()
-        calib_params["driver_path"] = vic_run_configs["vic_driver_path"]
-        calib_params["global_file"] = proj_path + "global_calibrate.txt"
-        calib_params["params_file"] = unicode(self.param_file_le.text())
-        calib_params["mpi"] = vic_run_configs["with_mpi"]
-        calib_params["ncores"] = vic_run_configs["n_cores"]
+        calib_configs = OrderedDict()
+        calib_configs["driver_path"] = vic_run_configs["vic_driver_path"]
+        calib_configs["global_file"] = proj_path + "global_calibrate.txt"
+        calib_configs["params_file"] = unicode(self.param_file_le.text())
+        calib_configs["mpi"] = vic_run_configs["with_mpi"]
+        calib_configs["ncores"] = vic_run_configs["n_cores"]
 
-        calib_params["start_date"] = list(self.start_date_de.date().getDate())
-        calib_params["end_date"] = list(self.end_date_de.date().getDate())
-        calib_params["calib_start_date"] = list(self.start_date_de.date().getDate())
+        calib_configs["start_date"] = list(self.start_date_de.date().getDate())
+        calib_configs["end_date"] = list(self.end_date_de.date().getDate())
+        calib_configs["calib_start_date"] = list(self.calib_start_date_de.date().getDate())
 
-        calib_params["rout_data_file"] = routing_configs["rout_data_file"]
-        calib_params["domain_file"] = routing_configs["domain_file"]
-        calib_params["vic_out_file"] = ""
-        calib_params["time_scale"] = unicode(self.time_scale_le.text())
-        calib_params["obs_data_file"] = unicode(self.obs_runoff_file_le.text())
-        calib_params["obs_start_date"] = list(self.start_date_de.date().getDate())
+        calib_configs["rout_data_file"] = routing_configs["rout_data_file"]
+        calib_configs["domain_file"] = routing_configs["domain_file"]
+        calib_configs["vic_out_file"] = ""
+        calib_configs["time_scale"] = unicode(self.time_scale_le.text())
+        calib_configs["obs_data_file"] = unicode(self.obs_runoff_file_le.text())
+        calib_configs["obs_start_date"] = list(self.start_date_de.date().getDate())
 
         if self.calib_range_cb.isChecked():
-            calib_params["calib_range"] = unicode(self.calib_range_le.text())
+            calib_configs["calib_range"] = unicode(self.calib_range_le.text())
         else:
-            calib_params["calib_range"] = None
+            calib_configs["calib_range"] = None
 
-        calib_params["BPC"] = float(self.bpc_le.text())
-        calib_params["only_bias"] = True if self.only_bias_cb.isChecked() else False
-        calib_params["turns"] = int(self.turns_le.text())
-        calib_params["max_itr"] = int(self.max_iterate_le.text())
-        calib_params["toler"] = float(self.toler_threshold_le.text())
+        calib_configs["BPC"] = float(self.bpc_le.text())
+        calib_configs["only_bias"] = True if self.only_bias_cb.isChecked() else False
+        calib_configs["turns"] = int(self.turns_le.text())
+        calib_configs["max_itr"] = int(self.max_iterate_le.text())
+        calib_configs["toler"] = float(self.toler_threshold_le.text())
 
         p_init = []
         for i in range(6):
@@ -1329,9 +1304,9 @@ class Calibrater(QWidget):
             for j in range(3):
                 iparam.append(float(self.calib_params_table.item(i, j).text()))
             p_init.append(iparam)
-        calib_params["p_init"] = p_init
+        calib_configs["p_init"] = p_init
 
-        return calib_params
+        return calib_configs
 
     def run_calibrate(self):
         rc = self.parent.proj.proj_params.get("routing_config")
@@ -1339,7 +1314,7 @@ class Calibrater(QWidget):
         if rc is None or vc is None:
             log.error("VIC run or Routing not set.")
             return
-        calib_params = self.create_calib_params()
+        calib_params = self.create_calib_configs()
         results = calibrate(self.parent.proj, calib_params)
         for i in range(6):
                 self.calib_result_table.setItem(i, 0, QTableWidgetItem(unicode(results[i])))
@@ -1376,6 +1351,7 @@ class ForcingCreater(QWidget):
         self.remove_item_btn = QPushButton("Remove item")
 
         self.forc_prefix_le = QLineEdit()
+        self.forc_prefix_le.setFixedWidth(160)
         self.forc_out_path_le = QLineEdit()
         self.forc_out_path_btn = QPushButton("...")
         self.forc_out_path_btn.setFixedWidth(36)
@@ -1432,19 +1408,19 @@ class ForcingCreater(QWidget):
         forcing_group.setLayout(forcing_layout)
 
         forcing_layout.addWidget(self.forcing_var_table, 0, 0, 6, 9)
-        forcing_layout.addWidget(self.add_item_btn, 6, 2, 1, 1)
-        forcing_layout.addWidget(self.remove_item_btn, 6, 4, 1, 2)
+        forcing_layout.addWidget(self.add_item_btn, 6, 5, 1, 2)
+        forcing_layout.addWidget(self.remove_item_btn, 6, 7, 1, 2)
 
         forcing_layout.addWidget(QLabel("Forcing file prefix:"), 7, 0, 1, 2)
         forcing_layout.addWidget(self.forc_prefix_le, 7, 2, 1, 1)
 
         forcing_layout.addWidget(QLabel("Forcing file output path:"), 8, 0, 1, 2)
-        forcing_layout.addWidget(self.forc_out_path_le, 8, 2, 1, 4)
-        forcing_layout.addWidget(self.forc_out_path_btn, 8, 6, 1, 1)
+        forcing_layout.addWidget(self.forc_out_path_le, 8, 2, 1, 3)
+        forcing_layout.addWidget(self.forc_out_path_btn, 8, 5, 1, 1)
 
         forcing_layout.addWidget(QLabel("Domain file path:"), 9, 0, 1, 2)
-        forcing_layout.addWidget(self.domain_file_le, 9, 2, 1, 4)
-        forcing_layout.addWidget(self.domain_file_btn, 9, 6, 1, 1)
+        forcing_layout.addWidget(self.domain_file_le, 9, 2, 1, 3)
+        forcing_layout.addWidget(self.domain_file_btn, 9, 5, 1, 1)
 
         forcing_layout.addWidget(QLabel("Start time:"), 7, 3, 1, 1)
         forcing_layout.addWidget(self.start_time_de, 7, 4, 1, 2)

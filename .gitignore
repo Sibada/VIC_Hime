@@ -7,4 +7,5 @@ deal.py
 *.pyc
 *.log
 *.vic_proj
-
+build/
+*.c

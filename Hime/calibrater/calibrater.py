@@ -3,7 +3,7 @@
 
 from Hime.statistic import nmse, bias
 from Hime.model_execer.vic_execer import vic_exec
-from Hime.routing.confluence import load_rout_data, confluence, gather_to_month
+from Hime.routing.confluence import load_rout_data, confluence, gather_to_month, write_runoff_data
 from Hime.utils import set_value_nc, set_soil_depth
 from Hime import log
 
@@ -15,8 +15,8 @@ import copy
 
 
 ########################################################################################################################
-# calibrate parameters should look like this.
-# calib_params = {
+# calibrate configures should look like this.
+# calib_configs = {
 #     "driver_path": "file_path",
 #     "global_file": "file_path",
 #     "params_file": "file_path",

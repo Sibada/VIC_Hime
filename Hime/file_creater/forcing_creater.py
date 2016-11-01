@@ -27,6 +27,13 @@ import datetime as dt
 import functools
 import netCDF4 as nc
 
+try:
+    import itp_c
+    idw = itp_c.idw
+except Exception:
+    from .interpolate import idw
+    print "local idw"
+
 ########################################################################################################################
 #
 # Read in atmospheric data of stations and coordinates of stations from text file.
@@ -158,7 +165,7 @@ def read_stn_data(forcing_params):
 
 ########################################################################################################################
 #
-# Create forcing files by interpolation.
+# Create forcing files by itp_c.
 #
 ########################################################################################################################
 
@@ -203,7 +210,7 @@ def create_forcing(forcing_data, create_params):
             grid_lats.append(lats[r])
     grid_coords = np.concatenate(([grid_lons], [grid_lats])).T
 
-    # ############################################ Choose interpolation method.
+    # ############################################ Choose itp_c method.
     if create_params["idw_params"] is not None:
         idp = create_params["idw_params"][0]
         maxd = create_params["idw_params"][1]
@@ -292,29 +299,3 @@ def create_forcing(forcing_data, create_params):
         ff.close()
     log.info("Forcing file creating completed.")
 
-
-########################################################################################################################
-#
-# Inverse distance weight interpolation.
-#
-########################################################################################################################
-def idw(stn_data, stn_coords, grid_coords, idp=2, maxd=np.inf, maxp=None):
-
-    n_grids = grid_coords.shape[0]
-
-    # Creat weight matrix.
-    W_o = np.ndarray((stn_coords.shape[0], n_grids))
-    for c in range(W_o.shape[1]):
-        w = np.array([np.linalg.norm(grid_coords[c]-stn_coord) for stn_coord in stn_coords])
-        w[w > maxd] = np.inf
-        w = 1/np.power(w, idp)
-        W_o[:, c] = w
-    W_mask = ~np.isnan(stn_data) * 1
-    stn_data[np.isnan(stn_data)] = 0
-
-    # Interpolation.
-    itp_data_o = np.dot(stn_data, W_o)
-    itp_data_b = np.dot(W_mask, W_o)
-    itp_data = itp_data_o / itp_data_b
-
-    return itp_data

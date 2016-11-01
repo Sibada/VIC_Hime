@@ -14,12 +14,11 @@ def vic_exec(driver_path, global_path, mpi=False, n_cores=4):
     else:
         sh = [driver_path, "-g", global_path]
 
-    print "Exec shell: "
-    print sh
-
     spc = sp.Popen(sh, stdout=sp.PIPE, stderr=sp.PIPE)
     status = spc.wait()
-    logs = spc.stdout.readlines()
+
+    logs_out = spc.stdout.readlines()
     logs_err = spc.stderr.readlines()
-    return status, logs, logs_err
+
+    return status, logs_out, logs_err
 
