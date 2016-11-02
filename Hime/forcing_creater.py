@@ -14,24 +14,25 @@ Yang H, Huafang L V, Qingfang H U, et al. Comparison of parametrization methods 
 radiation over the North China Plain[J]. Qinghua Daxue Xuebao/journal of Tsinghua University, 2014, 54(5):590-595.
 """
 
-from Hime import log
-from Hime.version import version as __version__
-from Hime import templates_path
-from Hime.utils import read_template
-
-from math import pi
-from collections import OrderedDict
-import numpy as np
-import pandas as pd
 import datetime as dt
 import functools
+from collections import OrderedDict
+from math import pi
+
 import netCDF4 as nc
+import numpy as np
+import pandas as pd
+
+from Hime import log
+from Hime import templates_path
+from Hime.utils import read_template
+from Hime.version import version as __version__
 
 try:
     import itp_c
     idw = itp_c.idw
 except Exception:
-    from .interpolate import idw
+    from Hime.interpolate import idw
     print "local idw"
 
 ########################################################################################################################

@@ -2,23 +2,25 @@
 #  -*- coding: utf-8 -*-
 
 
-from Hime import version as __version__
-from Hime import templates_path
-from Hime import log
-from Hime.model_execer.vic_execer import vic_exec
-from Hime.routing.uh_creater import create_rout
-from Hime.routing.confluence import write_rout_data, load_rout_data, confluence, write_runoff_data, gather_to_month
-from Hime.file_creater.forcing_creater import read_stn_data, create_forcing
-from Hime.file_creater.param_creater import create_params_file
-from Hime.calibrater.calibrater import calibrate
+import os
+import re
+from collections import OrderedDict
+from datetime import datetime as dt
+from os.path import join, dirname
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from collections import OrderedDict
-from datetime import datetime as dt
-import os
-import sys
-import re
+
+from Hime import log
+from Hime.vic_execer import vic_exec
+
+from Hime.routing import confluence, write_runoff_data, gather_to_month
+from Hime.uh_creater import write_rout_data, load_rout_data, create_rout
+
+from Hime.calibrater import calibrate
+
+from Hime.param_creater import create_params_file
+from Hime.forcing_creater import read_stn_data, create_forcing
 
 group_ss = "QGroupBox{border-radius: 5px; border: 2px groove lightgrey; margin-top: 1.2ex;font-family:serif}" \
            "QGroupBox::title {subcontrol-origin: margin;subcontrol-position: top left; left:15px;}"
@@ -980,8 +982,10 @@ class Routing(QWidget):
             os.makedirs(out_dir)
         except Exception:
             pass
-        write_runoff_data(runoffs, out_dir + unicode(self.stn_name_le.text()) + "_daily.txt")
-        write_runoff_data(runoffs_m, out_dir + unicode(self.stn_name_le.text()) + "_monthly.txt")
+
+        stn_name = rout_data["name"]
+        write_runoff_data(runoffs, join(out_dir, stn_name + "_daily.txt"))
+        write_runoff_data(runoffs_m, join(out_dir, stn_name + "_monthly.txt"))
 
 
 ########################################################################################################################
@@ -1360,8 +1364,10 @@ class ForcingCreater(QWidget):
         self.domain_file_btn.setFixedWidth(36)
         self.start_time_de = QDateTimeEdit()
         self.start_time_de.setDisplayFormat("yyyy-MM-dd")
+        self.start_time_de.setFixedWidth(160)
         self.end_time_de = QDateTimeEdit()
         self.end_time_de.setDisplayFormat("yyyy-MM-dd")
+        self.end_time_de.setFixedWidth(160)
 
         self.use_sh_cb = QCheckBox("Use sunshine hours data")
         self.sh_coords_le = QLineEdit()
@@ -1407,49 +1413,49 @@ class ForcingCreater(QWidget):
         forcing_layout = QGridLayout()
         forcing_group.setLayout(forcing_layout)
 
-        forcing_layout.addWidget(self.forcing_var_table, 0, 0, 6, 9)
-        forcing_layout.addWidget(self.add_item_btn, 6, 5, 1, 2)
-        forcing_layout.addWidget(self.remove_item_btn, 6, 7, 1, 2)
+        forcing_layout.addWidget(self.forcing_var_table, 0, 0, 6, 8)
+        forcing_layout.addWidget(self.add_item_btn, 6, 6, 1, 1)
+        forcing_layout.addWidget(self.remove_item_btn, 6, 7, 1, 1)
 
-        forcing_layout.addWidget(QLabel("Forcing file prefix:"), 7, 0, 1, 2)
-        forcing_layout.addWidget(self.forc_prefix_le, 7, 2, 1, 1)
+        forcing_layout.addWidget(QLabel("Forcing file prefix:"), 7, 0, 1, 1)
+        forcing_layout.addWidget(self.forc_prefix_le, 7, 1, 1, 1)
 
-        forcing_layout.addWidget(QLabel("Forcing file output path:"), 8, 0, 1, 2)
-        forcing_layout.addWidget(self.forc_out_path_le, 8, 2, 1, 3)
-        forcing_layout.addWidget(self.forc_out_path_btn, 8, 5, 1, 1)
+        forcing_layout.addWidget(QLabel("Forcing file output path:"), 8, 0, 1, 1)
+        forcing_layout.addWidget(self.forc_out_path_le, 8, 1, 1, 3)
+        forcing_layout.addWidget(self.forc_out_path_btn, 8, 4, 1, 1)
 
-        forcing_layout.addWidget(QLabel("Domain file path:"), 9, 0, 1, 2)
-        forcing_layout.addWidget(self.domain_file_le, 9, 2, 1, 3)
-        forcing_layout.addWidget(self.domain_file_btn, 9, 5, 1, 1)
+        forcing_layout.addWidget(QLabel("Domain file path:"), 9, 0, 1, 1)
+        forcing_layout.addWidget(self.domain_file_le, 9, 1, 1, 3)
+        forcing_layout.addWidget(self.domain_file_btn, 9, 4, 1, 1)
 
-        forcing_layout.addWidget(QLabel("Start time:"), 7, 3, 1, 1)
-        forcing_layout.addWidget(self.start_time_de, 7, 4, 1, 2)
-        forcing_layout.addWidget(QLabel("End time:"), 7, 6, 1, 1)
-        forcing_layout.addWidget(self.end_time_de, 7, 7, 1, 2)
+        forcing_layout.addWidget(QLabel("Start time:"), 8, 5, 1, 1)
+        forcing_layout.addWidget(self.start_time_de, 8, 6, 1, 2)
+        forcing_layout.addWidget(QLabel("End time:"), 9, 5, 1, 1)
+        forcing_layout.addWidget(self.end_time_de, 9, 6, 1, 2)
 
-        forcing_layout.addWidget(self.use_sh_cb, 10, 0, 1, 4)
-        forcing_layout.addWidget(QLabel("Station coordinates file:"), 11, 0, 1, 2)
-        forcing_layout.addWidget(self.sh_coords_le, 11, 2, 1, 3)
-        forcing_layout.addWidget(self.sh_coords_btn, 11, 5, 1, 1)
-        forcing_layout.addWidget(QLabel("Sunshine hours data file:"), 12, 0, 1, 2)
-        forcing_layout.addWidget(self.sh_data_le, 12, 2, 1, 3)
-        forcing_layout.addWidget(self.sh_data_btn, 12, 5, 1, 1)
-        forcing_layout.addWidget(QLabel("Temperature data file:"), 13, 0, 1, 2)
-        forcing_layout.addWidget(self.temp_data_le, 13, 2, 1, 3)
-        forcing_layout.addWidget(self.temp_data_btn, 13, 5, 1, 1)
-        forcing_layout.addWidget(QLabel("VP data file:"), 14, 0, 1, 2)
-        forcing_layout.addWidget(self.vp_data_le, 14, 2, 1, 3)
-        forcing_layout.addWidget(self.vp_data_btn, 14, 5, 1, 1)
-        forcing_layout.addWidget(QLabel("Shortwave var name:"), 11, 6, 1, 2)
-        forcing_layout.addWidget(self.swdown_le, 11, 8)
-        forcing_layout.addWidget(QLabel("Longwave var name:"), 12, 6, 1, 2)
-        forcing_layout.addWidget(self.lwdown_le, 12, 8)
-        forcing_layout.addWidget(QLabel("Interpolation params:"), 13, 6, 1, 3)
-        forcing_layout.addWidget(self.itp_p1_le, 14, 6)
-        forcing_layout.addWidget(self.itp_p2_le, 14, 7)
-        forcing_layout.addWidget(self.itp_p3_le, 14, 8)
+        forcing_layout.addWidget(self.use_sh_cb, 10, 0, 1, 1)
+        forcing_layout.addWidget(QLabel("Station coordinates file:"), 11, 0, 1, 1)
+        forcing_layout.addWidget(self.sh_coords_le, 11, 1, 1, 3)
+        forcing_layout.addWidget(self.sh_coords_btn, 11, 4, 1, 1)
+        forcing_layout.addWidget(QLabel("Sunshine hours data file:"), 12, 0, 1, 1)
+        forcing_layout.addWidget(self.sh_data_le, 12, 1, 1, 3)
+        forcing_layout.addWidget(self.sh_data_btn, 12, 4, 1, 1)
+        forcing_layout.addWidget(QLabel("Temperature data file:"), 13, 0, 1, 1)
+        forcing_layout.addWidget(self.temp_data_le, 13, 1, 1, 3)
+        forcing_layout.addWidget(self.temp_data_btn, 13, 4, 1, 1)
+        forcing_layout.addWidget(QLabel("VP data file:"), 14, 0, 1, 1)
+        forcing_layout.addWidget(self.vp_data_le, 14, 1, 1, 3)
+        forcing_layout.addWidget(self.vp_data_btn, 14, 4, 1, 1)
+        forcing_layout.addWidget(QLabel("Shortwave var name:"), 11, 5, 1, 2)
+        forcing_layout.addWidget(self.swdown_le, 11, 7)
+        forcing_layout.addWidget(QLabel("Longwave var name:"), 12, 5, 1, 2)
+        forcing_layout.addWidget(self.lwdown_le, 12, 7)
+        forcing_layout.addWidget(QLabel("Interpolation params:"), 13, 5, 1, 3)
+        forcing_layout.addWidget(self.itp_p1_le, 14, 5)
+        forcing_layout.addWidget(self.itp_p2_le, 14, 6)
+        forcing_layout.addWidget(self.itp_p3_le, 14, 7)
 
-        forcing_layout.addWidget(self.apply_configs_btn, 15, 3, 1, 2)
+        forcing_layout.addWidget(self.apply_configs_btn, 15, 4, 1, 2)
         forcing_layout.addWidget(self.forcing_start_btn, 15, 6, 1, 2)
 
         #######################################################################

@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from Hime.statistic import nmse, bias
-from Hime.model_execer.vic_execer import vic_exec
-from Hime.routing.confluence import load_rout_data, confluence, gather_to_month, write_runoff_data
-from Hime.utils import set_value_nc, set_soil_depth
-from Hime import log
-
-from datetime import datetime
+import copy
 from collections import OrderedDict
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-import copy
+
+from Hime import log
+from Hime.uh_creater import load_rout_data
+from Hime.routing import confluence, gather_to_month
+from Hime.statistic import nmse, bias
+from Hime.utils import set_nc_value
+from Hime.vic_execer import vic_exec
 
 
 ########################################################################################################################
@@ -110,23 +112,22 @@ def vic_try(calib_params):
     else:
         e = np.abs(BIAS) * BPC + NMSE
 
-    log.debug("VIC runs result  E: %.3f   NMSE: %.3f BIAS: %.3f" % (e, NMSE, BIAS))
     return e, NMSE, BIAS
 
 
 def set_params(params_file, calib_range, var_id, value):
     if var_id == 0:
-        set_value_nc(params_file, "infilt", value, col_row=calib_range)
+        set_nc_value(params_file, "infilt", value, mask=calib_range)
     if var_id == 1:
-        set_value_nc(params_file, "Ds", value, col_row=calib_range)
+        set_nc_value(params_file, "Ds", value, mask=calib_range)
     if var_id == 2:
-        set_value_nc(params_file, "Dsmax", value, col_row=calib_range)
+        set_nc_value(params_file, "Dsmax", value, mask=calib_range)
     if var_id == 3:
-        set_value_nc(params_file, "Ws", value, col_row=calib_range)
+        set_nc_value(params_file, "Ws", value, mask=calib_range)
     if var_id == 4:
-        set_soil_depth(params_file, 2, value, col_row=calib_range)
+        set_nc_value(params_file, "depth", value, mask=calib_range, dims=1)
     if var_id == 5:
-        set_soil_depth(params_file, 3, value, col_row=calib_range)
+        set_nc_value(params_file, "depth", value, mask=calib_range, dims=2)
 
 
 def vic_try_with_param(calib_configs, var_id, value):
@@ -135,6 +136,8 @@ def vic_try_with_param(calib_configs, var_id, value):
     set_params(params_file, calib_range, var_id, value)
 
     e, NMSE, BIAS = vic_try(calib_configs)
+
+    log.debug("VIC runs result  value: %.3f  E: %.3f   NMSE: %.3f BIAS: %.3f" % (value, e, NMSE, BIAS))
     return [e, NMSE, BIAS]
 
 
@@ -165,8 +168,8 @@ def calibrate(proj, calib_configs):
     BPC = calib_configs["BPC"]
 
     # Set run area.
-    set_value_nc(params_file, "run_cell", 0, all=True)
-    set_value_nc(params_file, "run_cell", 1, col_row=calib_range)
+    set_nc_value(params_file, "run_cell", 0)
+    set_nc_value(params_file, "run_cell", 1, mask=calib_range)
 
     ###########################################################################
     # Create a single global file for calibration.
@@ -245,11 +248,8 @@ def calibrate(proj, calib_configs):
             step_r = rs[od[0]]
             de = es[od[2]] - es[od[0]]
 
-            itr = 0  # Iteration times of single parameter.
+            itr = 1  # Iteration times of single parameter.
             while de >= toler:
-                if itr > max_itr:
-                    break
-
                 if es[1] < es[0] and es[1] < es[2]:
                     x[0] = (x[0] + x[1])/2
                     x[2] = (x[1] + x[2])/2
@@ -257,7 +257,7 @@ def calibrate(proj, calib_configs):
                     rs[2] = vic_try_with_param(calib_configs, p, x[2])
 
                 elif es[0] < es[1] < es[2]:
-                    if lcb[p] < 0 and x[0] == lcb[p]:
+                    if lcb[p] > 0 and x[0] == lcb[p]:
                         break
 
                     x[2], x[1], x[0] = x[1], x[0], x[0]-(x[2]-x[0])/2
@@ -295,13 +295,15 @@ def calibrate(proj, calib_configs):
                 step_params[p] = opt_val
                 step_r = rs[od[0]]
                 de = es[od[2]] - es[od[0]]
-                itr += 1
 
                 log.info("Iteration %d: param value=%.3f, E=%.3f, NSCE=%.3f, BIAS=%.3f" %
                          (itr, opt_val, opt_E, 1-NMSE, BIAS))
                 log.debug("[%.3f, %.3f, %.3f, %.3f, %.3f, %.3f] => VIC => E:%.3f, NMSE:%.3f, BIAS:%.3f"
                           % (step_params[0], step_params[1], step_params[2], step_params[3],
                              step_params[4], step_params[5], opt_E, NMSE, BIAS))
+                itr += 1
+                if itr > max_itr:
+                    break
 
             log.info("Parameter %s calibrated. Optimized value: %.3f, E: %.3f, NSCE: %.3f, BIAS: %.3f" %
                      (param_name, opt_val, opt_E, 1-NMSE, BIAS))

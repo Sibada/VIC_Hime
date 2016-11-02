@@ -39,54 +39,35 @@ def xy_to_sn(x, y, nx=None, ny=None):
 
 ########################################################################################################################
 #
-# Amend value in a nCDF file.
+# Set value in a nCDF file.
 #
 ########################################################################################################################
-def set_value_nc(nc_file, variable, value, cell_id=None, col_row=None, all=False):
+def set_nc_value(nc_file, variable, value, mask=None, dims=None):
     ncf = nc.Dataset(nc_file, "a")
 
     var = ncf.variables[variable]
-    var_val = np.array(var[:])
-    val_mask = np.zeros_like(var_val, dtype="int32")
+    if dims is not None:
+        if type(dims) == list or type(dims) == tuple:
+            for dim in dims:
+                var = var[dim]
+        elif type(dims) == int or type(dims) == float:
+            var = var[dims]
+        else:
+            raise ValueError("dims should be number or list of numbers.")
 
-    if cell_id is not None:
-        val_mask[ncf.variables["gridcel"][:] in cell_id] = 1
+    val = np.array(var[:])
+    val_mask = np.zeros_like(val, dtype="int32")
 
-    if col_row is not None:
-        for cr in col_row:
+    if mask is None:
+        val_mask[val != -9999] = 1
+    else:
+        for cr in mask:
             val_mask[cr[1], cr[0]] = 1
 
-    if all:
-        val_mask[var_val != -9999] = 1
-
-    var_val[val_mask > 0] = value
-    var[:] = var_val
+    val[val_mask > 0] = value
+    var[:] = val
 
     ncf.close()
 
-
-########################################################################################################################
-#
-# Amend value in a nCDF file.
-#
-########################################################################################################################
-def set_soil_depth(nc_file, layer, value, cell_id=None, col_row=None):
-    ncf = nc.Dataset(nc_file, "a")
-
-    var = ncf.variables["depth"]
-    var_val = np.array(var[layer-1, :])
-    val_mask = np.zeros_like(var_val, dtype="int32")
-
-    if cell_id is not None:
-        val_mask[ncf.variables["gridcel"][:] in cell_id] = 1
-
-    if col_row is not None:
-        for cr in col_row:
-            val_mask[cr[1], cr[0]] = 1
-
-    var_val[val_mask > 0] = value
-    var[layer-1, :] = var_val
-
-    ncf.close()
 
 

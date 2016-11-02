@@ -3,6 +3,7 @@
 
 
 from Hime import version as __version__
+from os.path import dirname, join
 
 import platform
 import os
@@ -16,6 +17,7 @@ from interfaces import GlobalConfig, VicRun, Routing, Calibrater, ForcingCreater
 from Hime import log
 from Hime.vic_proj import VicProj
 
+img_src = join(dirname(__file__), "img_src")
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -302,7 +304,7 @@ def main():
     app.setOrganizationDomain("None yet")
     app.setApplicationName("VIC Hime")
     app.setApplicationVersion(__version__)
-    # app.setWindowIcon(QIcon(":/icon.png"))
+    app.setWindowIcon(QIcon(join(img_src, "icon.png")))
     form = MainWindow()
     form.show()
     app.exec_()

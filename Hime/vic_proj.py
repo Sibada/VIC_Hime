@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from Hime import log
-from .version import version as __version__
+from Hime import *
+from Hime import version as __version__
+
 from collections import OrderedDict
 import datetime
 import json

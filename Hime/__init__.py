@@ -1,24 +1,22 @@
 #!/usr/bin/env python
 #  -*- coding: utf-8 -*-
 
-from .version import version
+from Hime.version import version
 
-import os
+from os.path import dirname, join
 import logging
 
-templates_path = os.path.split(os.path.realpath(__file__)) [0] + "/templates"
+templates_path = join(dirname(__file__), "templates")
 
-# Set logger
+########################################################################################################################
+# Logger config.
+########################################################################################################################
 logging.basicConfig(level=logging.DEBUG)
 console_log = logging.StreamHandler()
 console_log.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s',
                                            datefmt='%Y-%m-%d %H:%M:%S'))
 
-file_log = logging.FileHandler(os.path.split(os.path.realpath(__file__))[0] + "/calib_info.log")
-file_log.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s',
-                                        datefmt='%Y-%m-%d %H:%M:%S'))
-
 log = logging.getLogger("Hime")
-
 log.addHandler(console_log)
-log.addHandler(file_log)
+
+########################################################################################################################

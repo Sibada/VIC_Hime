@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division
-import numpy as np
 
 # Caculate statistic params such as NMSE ,BIAS and BABS.
 
 
 def nmse(obs, sim):
     mse = ((obs - sim) ** 2).mean()
-    return mse / obs.var()
+    nmse = mse / obs.var()
+    return nmse
 
 
 def bias(obs, sim):

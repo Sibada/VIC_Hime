@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from Hime import log
+from Hime import *
 from Hime.ascii_grid import Grid
 from Hime import templates_path
 from Hime.utils import xy_to_sn
 from math import acos, sin, cos, pi
 from collections import OrderedDict
 import numpy as np
+import json
 
 
 ########################################################################################################################
@@ -267,5 +268,32 @@ def create_rout(rout_info):
     log.info("Unit hydrology data has been created.")
     return rout_data
 
+
+########################################################################################################################
+#
+# Load and save rout data.
+#
+########################################################################################################################
+def load_rout_data(file_path):
+    df = open(file_path, "r")
+    json_lines = "".join(df.readlines())
+    rout_data = json.loads(json_lines)
+    df.close()
+
+    rout_data["basin"] = np.array(rout_data["basin"])
+    rout_data["uh_cell"] = np.array(rout_data["uh_cell"])
+    return rout_data
+
+
+def write_rout_data(rout_data, out_file):
+    rout_data["basin"] = list(rout_data["basin"])
+    rout_data["uh_cell"] = list(rout_data["uh_cell"])
+    rout_json = json.dumps(rout_data)
+    df = open(out_file, "w")
+    df.writelines(rout_json)
+
+    df.writelines(["\n", "\n"])  # Write a new empty line for reading by R.
+    df.close()
+    log.info("Rout data has been write to file %s" % out_file)
 
 
