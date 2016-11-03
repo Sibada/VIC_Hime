@@ -206,9 +206,9 @@ def calibrate(proj, calib_configs):
     ###########################################################################
     param_names = ["infilt", "Ds", "Dsmax", "Ws", "d2", "d3"]
 
-    lob = [0, 0, 0, 0, -1, -1]  # Left open boundary, -1 means not boundary.
+    lob = [0, 0, 0, 0, 0.1, 0.1]  # Left open boundary, -1 means not boundary.
     rob = [1, 1, -1, 1, -1, -1]  # Right open boundary.
-    lcb = [-1, -1, -1, -1, 0.1, 0.1]  # Left close boundary. Params can get this value.
+    lcb = [-1, -1, -1, -1, -1, -1]  # Left close boundary. Params can get this value.
     rcb = [-1, -1, -1, -1, 10, 10]  # Right close boundary.
 
     step_r = None
@@ -218,6 +218,7 @@ def calibrate(proj, calib_configs):
     log.info("###### Automatical calibration start... ######")
     log.info("\nTurns:\t%d\nmax itr:\t%d\ntoler:\t%.5f\nBPC:\t%.2f" % (turns, max_itr, toler, BPC))
 
+    # MDZZ Algorithm for calibration of VIC.
     for t in range(turns):
         turn = t + 1
         log.info("Turns %d:" % turn)
@@ -258,31 +259,35 @@ def calibrate(proj, calib_configs):
 
                 elif es[0] < es[1] < es[2]:
                     if lcb[p] > 0 and x[0] == lcb[p]:
-                        break
+                        x[2], rs[2] = x[1], rs[1]
+                        x[1] = (x[2] + x[0])/2
+                        rs[1] = vic_try_with_param(calib_configs, p, x[1])
+                    else:
+                        x[2], x[1], x[0] = x[1], x[0], x[0]-(x[2]-x[0])/2
+                        rs[2], rs[1] = rs[1], rs[0]
 
-                    x[2], x[1], x[0] = x[1], x[0], x[0]-(x[2]-x[0])/2
-                    rs[2], rs[1] = rs[1], rs[0]
+                        if lcb[p] > 0 and x[0] < lcb[p]:
+                            x[0] = lcb[p]
+                        elif lob[p] > 0 and x[0] <= lob[p]:
+                            x[0] = x[1] - 0.618 * (x[1]-lob)
 
-                    if lcb[p] > 0 and x[0] < lcb[p]:
-                        x[0] = lcb[p]
-                    elif lob[p] > 0 and x[0] <= lob[p]:
-                        x[0] = x[1] - 0.618 * (x[1]-lob)
-
-                    rs[0] = vic_try_with_param(calib_configs, p, x[0])
+                        rs[0] = vic_try_with_param(calib_configs, p, x[0])
 
                 elif es[0] > es[1] > es[2]:
                     if rcb[p] > 0 and x[2] == rcb[p]:
-                        break
+                        x[0], rs[0] = x[1]. rs[1]
+                        x[1] = (x[2] + x[0])/2
+                        rs[1] = vic_try_with_param(calib_configs, p, x[1])
+                    else:
+                        x[0], x[1], x[2] = x[1], x[2], x[2]+(x[2]-x[0])/2
+                        rs[0], rs[1] = rs[1], rs[2]
 
-                    x[0], x[1], x[2] = x[1], x[2], x[2]+(x[2]-x[0])/2
-                    rs[0], rs[1] = rs[1], rs[2]
+                        if x[2] > rcb[p] > 0:
+                            x[2] = lcb[p]
+                        elif x[2] >= rob[p] > 0:
+                            x[2] = x[1] + 0.618 * (rob[p]-x[1])
 
-                    if x[2] > rcb[p] > 0:
-                        x[2] = lcb[p]
-                    elif x[2] >= rob[p] > 0:
-                        x[2] = x[1] + 0.618 * (rob[p]-x[1])
-
-                    rs[2] = vic_try_with_param(calib_configs, p, x[2])
+                        rs[2] = vic_try_with_param(calib_configs, p, x[2])
 
                 es, NMSEs, BIASs = [r[0] for r in rs], [r[1] for r in rs], [r[2] for r in rs]
 

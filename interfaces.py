@@ -1396,15 +1396,19 @@ class ForcingCreater(QWidget):
         self.itp_p3_le = QLineEdit()
         self.itp_p3_le.setFixedWidth(48)
 
+        self.sh_start_time_de = QDateTimeEdit()
+        self.sh_start_time_de.setDisplayFormat("yyyy-MM-dd")
+        self.sh_start_time_de.setFixedWidth(160)
+
         self.forcing_start_btn = QPushButton("Start creating")
         self.apply_configs_btn = QPushButton("&Apply configs")
 
-        self.forcing_var_table.setColumnCount(7)
+        self.forcing_var_table.setColumnCount(8)
         self.forcing_var_table.setMinimumHeight(96)
         self.forcing_var_table.setHorizontalHeaderLabels([
-            "Data path", "Coordinates path", "Variable name", "Type", "ITP p1", "ITP p2", "ITP p3"])
+            "Data path", "Coordinates path", "Variable name", "Type","Start date", "ITP p1", "ITP p2", "ITP p3"])
         forcing_header = self.forcing_var_table.horizontalHeader()
-        [forcing_header.setResizeMode(i, QHeaderView.ResizeToContents) for i in range(7)]
+        [forcing_header.setResizeMode(i, QHeaderView.ResizeToContents) for i in range(8)]
         [forcing_header.setResizeMode(i, QHeaderView.Stretch) for i in range(2)]
 
         forcing_group = QGroupBox()
@@ -1454,6 +1458,8 @@ class ForcingCreater(QWidget):
         forcing_layout.addWidget(self.itp_p1_le, 14, 5)
         forcing_layout.addWidget(self.itp_p2_le, 14, 6)
         forcing_layout.addWidget(self.itp_p3_le, 14, 7)
+        forcing_layout.addWidget(QLabel("Start date of Above data:"), 15, 0, 1, 1)
+        forcing_layout.addWidget(self.sh_start_time_de, 15, 1, 1, 2)
 
         forcing_layout.addWidget(self.apply_configs_btn, 15, 4, 1, 2)
         forcing_layout.addWidget(self.forcing_start_btn, 15, 6, 1, 2)
@@ -1550,6 +1556,7 @@ class ForcingCreater(QWidget):
             self.configs["sw_varname"] = "swdown"
             self.configs["lw_varname"] = "lwdown"
             self.configs["wave_itp_params"] = [2.0, 6.0, 6]
+            self.configs["sh_start_time"] = [1960, 1, 1]
 
             self.configs["forcing_vars"] = []
 
@@ -1580,11 +1587,13 @@ class ForcingCreater(QWidget):
         self.itp_p1_le.setText(unicode(self.configs["wave_itp_params"][0]))
         self.itp_p2_le.setText(unicode(self.configs["wave_itp_params"][1]))
         self.itp_p3_le.setText(unicode(self.configs["wave_itp_params"][2]))
+        shsdt = self.configs["sh_start_time"]
+        self.sh_start_time_de.setDateTime(dt(shsdt[0], shsdt[1], shsdt[2]))
 
         forcing_vars = self.configs["forcing_vars"]
         self.forcing_var_table.setRowCount(len(forcing_vars))
         for i in range(len(forcing_vars)):
-            for j in range(7):
+            for j in range(len(forcing_vars[i])):
                 self.forcing_var_table.setItem(i, j, QTableWidgetItem(forcing_vars[i][j]))
 
         if self.configs["itp_method"] == 0:
@@ -1611,12 +1620,13 @@ class ForcingCreater(QWidget):
 
         self.configs["wave_itp_params"] = [float(self.itp_p1_le.text()),
                                            float(self.itp_p2_le.text()),
-                                           float(self.itp_p3_le.text()),]
+                                           float(self.itp_p3_le.text())]
+        self.configs["sh_start_time"] = list(self.sh_start_time_de.date().getDate())
 
         vars = []
         for i in range(self.forcing_var_table.rowCount()):
             var = []
-            for j in range(7):
+            for j in range(self.forcing_var_table.columnCount()):
                 var.append(unicode(self.forcing_var_table.item(i, j).text()))
             vars.append(var)
         self.configs["forcing_vars"] = vars
@@ -1634,9 +1644,9 @@ class ForcingCreater(QWidget):
         nrow_o = table.rowCount()
         table.setRowCount(nrow_o + 1)
         if nrow_o < 1:
-            table.setItem(nrow_o, 4, QTableWidgetItem(QString("2.0")))
-            table.setItem(nrow_o, 5, QTableWidgetItem(QString("6.0")))
+            table.setItem(nrow_o, 5, QTableWidgetItem(QString("2.0")))
             table.setItem(nrow_o, 6, QTableWidgetItem(QString("6.0")))
+            table.setItem(nrow_o, 7, QTableWidgetItem(QString("6.0")))
         else:
             for i in range(table.columnCount()):
                 table.setItem(nrow_o, i, QTableWidgetItem(table.item(nrow_o-1, i)))
@@ -1648,7 +1658,10 @@ class ForcingCreater(QWidget):
         [table.removeRow(r) for r in rs]
         log.debug("Remove row %s" % rs)
 
-    def create_forcing_params(self):
+    ###########################################################################
+    # Create a dict contains configures for creating forcing files.
+    ###########################################################################
+    def create_forcing_configss(self):
         forcing_params = OrderedDict()
         variables = []
         nvar = self.forcing_var_table.rowCount()
@@ -1658,9 +1671,10 @@ class ForcingCreater(QWidget):
                 "coords_path": unicode(self.forcing_var_table.item(r, 1).text()),
                 "var_name": unicode(self.forcing_var_table.item(r, 2).text()),
                 "type": unicode(self.forcing_var_table.item(r, 3).text()),
-                "itp_params": [float(unicode(self.forcing_var_table.item(r, 4).text())),
-                               float(unicode(self.forcing_var_table.item(r, 5).text())),
-                               float(unicode(self.forcing_var_table.item(r, 6).text()))]
+                "start_time": unicode(self.forcing_var_table.item(r, 4).text()),
+                "itp_params": [float(unicode(self.forcing_var_table.item(r, 5).text())),
+                               float(unicode(self.forcing_var_table.item(r, 6).text())),
+                               float(unicode(self.forcing_var_table.item(r, 7).text()))]
             }
             variables.append(var)
         forcing_params["variables"] = variables
@@ -1676,6 +1690,7 @@ class ForcingCreater(QWidget):
                                         unicode(self.vp_data_le.text()),
                                         unicode(self.swdown_le.text()),
                                         unicode(self.lwdown_le.text()),
+                                        list(self.sh_start_time_de.date().getDate()),
                                         float(self.itp_p1_le.text()),
                                         float(self.itp_p2_le.text()),
                                         float(self.itp_p3_le.text()),]
@@ -1703,7 +1718,7 @@ class ForcingCreater(QWidget):
             os.makedirs(unicode(self.forc_out_path_le.text()))
         except Exception:
             log.warn(unicode(self.forc_out_path_le.text()) + " exist.")
-        forcing_params = self.create_forcing_params()
+        forcing_params = self.create_forcing_configss()
         forcing_data = read_stn_data(forcing_params)
 
         create_params = self.create_create_params()

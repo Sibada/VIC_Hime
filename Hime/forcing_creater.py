@@ -19,9 +19,11 @@ import functools
 from collections import OrderedDict
 from math import pi
 
+import re
 import netCDF4 as nc
 import numpy as np
 import pandas as pd
+import datetime as dt
 
 from Hime import log
 from Hime import templates_path
@@ -35,6 +37,7 @@ except Exception:
     from Hime.interpolate import idw
     print "local idw"
 
+
 ########################################################################################################################
 #
 # Read in atmospheric data of stations and coordinates of stations from text file.
@@ -46,7 +49,8 @@ except Exception:
 # forcing_params is a dict or OrderedDict include those:
 #
 # {
-#   "variables": [{"data_path": "path", "coords_path": "path", "var_name": "var_name", "type": "desc"}, ...],
+#   "variables": [{"data_path": "path", "coords_path": "path", "var_name": "var_name", "type": "desc",
+#                  "start_time":"YYYY-mm-dd"}, ...],
 #   "start_time": [year, month, day],
 #   "end_time": [year, month, day],
 #   "use_sh": ["coords_path": "coords_path", "sh_path", "temp_path", "vp_path", "sw_var_name", "lw_var_name"],
@@ -72,8 +76,14 @@ def read_stn_data(forcing_params):
     var_data = []
     for variable in variables:
         log.info("Reading %s" % variable["data_path"])
-        data = np.array(pd.read_table(variable["data_path"], sep=r"[\s,;]", header=None))
+        ymd = map(int, re.split("[-\\\\/,\\.\s]", variable["start_time"]))
+        data_start_time = dt.datetime(ymd[0], ymd[1], ymd[2])
         coords = np.array(pd.read_table(variable["coords_path"], sep=r"[\s,;]", header=None))
+
+        data = np.array(pd.read_table(variable["data_path"], sep=r"[\s,;]", header=None))
+        ts = pd.date_range(data_start_time, periods=data.shape[0], freq=freq)
+        data = data[ts >= start_time]
+
         new_var = OrderedDict({
             "data": data,
             "coords": coords,
@@ -102,14 +112,21 @@ def read_stn_data(forcing_params):
 
         sw_var_name = use_sh[4]
         lw_var_name = use_sh[5]
+        ymd = use_sh[6]
+        sh_start_time = dt.datetime(ymd[0], ymd[1], ymd[2])
 
-        itp_params = [use_sh[6], use_sh[7], use_sh[8]]
+        itp_params = [use_sh[7], use_sh[8], use_sh[9]]
 
         # TODO: Check if those before is empty string.
         coords = np.array(pd.read_table(coords_path, sep=r"[\s,;]", header=None))
         sh = np.array(pd.read_table(sh_path, sep=r"[\s,;]", header=None))
         temp = np.array(pd.read_table(temp_path, sep=r"[\s,;]", header=None))
         vp = np.array(pd.read_table(vp_path, sep=r"[\s,;]", header=None))
+
+        ts = pd.date_range(sh_start_time, periods=sh.shape[0], freq=freq)
+        sh = sh[ts >= start_time]
+        temp = temp[ts >= start_time]
+        vp = vp[ts >= start_time]
 
         swdown = np.ndarray(sh.shape)
         lwdown = np.ndarray(sh.shape)
@@ -129,7 +146,6 @@ def read_stn_data(forcing_params):
             Rs = (a_s + b_s * sh[:, i] / N) * Ra
 
             # Estimate incoming long wave radiation using Konzelmann equation.
-
             eps_ac = 0.23 + 0.848 * np.power(vp[:, i] * 10 / (temp[:, i] + 273.15), 1.0 / 7.0)
             s = (a_s + b_s * sh[:, i] / N) / (a_s + b_s)
             eps_a = 1 - s + s * eps_ac
@@ -286,11 +302,11 @@ def create_forcing(forcing_data, create_params):
             try:
                 maxd = float(itp_params[1])
             except Exception:
-                maxd = 6.0
+                maxd = -1.0
             try:
                 maxp = int(itp_params[2])
             except Exception:
-                maxp = 6
+                maxp = -1
 
             itp_data = idw(data[in_this_year], coords, grid_coords, idp=idp, maxd=maxd, maxp=maxp)
             values = np.zeros((time_len, mask.shape[0] * mask.shape[1])) - 9999.0
