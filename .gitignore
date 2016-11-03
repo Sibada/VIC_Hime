@@ -9,3 +9,6 @@ deal.py
 *.vic_proj
 build/
 *.c
+
+*.egg-info/
+dist/

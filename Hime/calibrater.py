@@ -206,9 +206,9 @@ def calibrate(proj, calib_configs):
     ###########################################################################
     param_names = ["infilt", "Ds", "Dsmax", "Ws", "d2", "d3"]
 
-    lob = [0, 0, 0, 0, 0.1, 0.1]  # Left open boundary, -1 means not boundary.
+    lob = [0, 0, 0, 0, -1, -1]  # Left open boundary, -1 means not boundary.
     rob = [1, 1, -1, 1, -1, -1]  # Right open boundary.
-    lcb = [-1, -1, -1, -1, -1, -1]  # Left close boundary. Params can get this value.
+    lcb = [-1, -1, -1, -1, 0.1, 0.1]  # Left close boundary. Params can get this value.
     rcb = [-1, -1, -1, -1, 10, 10]  # Right close boundary.
 
     step_r = None

@@ -31,12 +31,10 @@ from Hime.utils import read_template
 from Hime.version import version as __version__
 
 try:
-    import itp_c
-    idw = itp_c.idw
-except Exception:
+    from Hime.lib.idw import idw
+except ImportError:
     from Hime.interpolate import idw
-    print "local idw"
-
+    print 'Warning: C function of IDW imported failed.'
 
 ########################################################################################################################
 #
