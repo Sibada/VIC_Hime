@@ -125,9 +125,9 @@ def set_params(params_file, calib_range, var_id, value):
     if var_id == 3:
         set_nc_value(params_file, "Ws", value, mask=calib_range)
     if var_id == 4:
-        set_nc_value(params_file, "depth", value, mask=calib_range, dims=1)
+        set_nc_value(params_file, "depth", value, mask=calib_range, dim=1)
     if var_id == 5:
-        set_nc_value(params_file, "depth", value, mask=calib_range, dims=2)
+        set_nc_value(params_file, "depth", value, mask=calib_range, dim=2)
 
 
 def vic_try_with_param(calib_configs, var_id, value):
@@ -159,7 +159,7 @@ def calibrate(proj, calib_configs):
 
     calib_range = calib_configs["rout_data"]["basin"]\
         if calib_configs.get("calib_range_file") is None \
-        else np.loadtxt(calib_configs.get["calib_range_file"], dtype=int, delimiter=r"[/s,]")
+        else np.loadtxt(calib_configs.get("calib_range_file"), dtype=int, delimiter=r"[/s,]")
     calib_configs["calib_range"] = calib_range
 
     turns = calib_configs["turns"]

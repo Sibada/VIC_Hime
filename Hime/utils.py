@@ -42,20 +42,18 @@ def xy_to_sn(x, y, nx=None, ny=None):
 # Set value in a nCDF file.
 #
 ########################################################################################################################
-def set_nc_value(nc_file, variable, value, mask=None, dims=None):
+def set_nc_value(nc_file, variable, value, mask=None, dim=None):
     ncf = nc.Dataset(nc_file, "a")
 
     var = ncf.variables[variable]
-    if dims is not None:
-        if type(dims) == list or type(dims) == tuple:
-            for dim in dims:
-                var = var[dim]
-        elif type(dims) == int or type(dims) == float:
-            var = var[dims]
+    varv = var
+    if dim is not None:
+        if type(dim) == int or type(dim) == float:
+            varv = varv[dim]
         else:
-            raise ValueError("dims should be number or list of numbers.")
+            raise ValueError("dims should be a number.")
 
-    val = np.array(var[:])
+    val = np.array(varv[:])
     val_mask = np.zeros_like(val, dtype="int32")
 
     if mask is None:
@@ -65,7 +63,10 @@ def set_nc_value(nc_file, variable, value, mask=None, dims=None):
             val_mask[cr[1], cr[0]] = 1
 
     val[val_mask > 0] = value
-    var[:] = val
+    if dim is not None:
+        var[dim, :] = val
+    else:
+        var[:] = val
 
     ncf.close()
 

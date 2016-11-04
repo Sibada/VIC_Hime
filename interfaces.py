@@ -4,6 +4,7 @@
 
 import os
 import re
+import numpy as np
 from collections import OrderedDict
 from datetime import datetime as dt
 from os.path import join, dirname
@@ -21,6 +22,8 @@ from Hime.calibrater import calibrate
 
 from Hime.param_creater import create_params_file
 from Hime.forcing_creater import read_stn_data, create_forcing
+
+from Hime.utils import set_nc_value
 
 group_ss = "QGroupBox{border-radius: 5px; border: 2px groove lightgrey; margin-top: 1.2ex;font-family:serif}" \
            "QGroupBox::title {subcontrol-origin: margin;subcontrol-position: top left; left:15px;}"
@@ -530,6 +533,8 @@ class VicRun(QWidget):
         self.apply_configs_btn = QPushButton("&Apply configs")
         self.mpi_cb = QCheckBox("Run with MPI")
 
+        self.run_range_le = QLineEdit()
+
         self.apply_configs_btn = QPushButton("&Apply configs")
         self.run_btn = QPushButton("&Run VIC")
 
@@ -606,9 +611,19 @@ class VicRun(QWidget):
 
     def run_vic(self):
         # If you want to routing after run vic you should configure the routing options.
-        if self.rout_cb.isChecked() and self.parent.proj.proj_params.get("routing_config") is None:
-            log.error("Routing configs was not set. Can not run with routing.")
-            return
+        routing_configs = None
+        rout_data = None
+        if self.rout_cb.isChecked():
+            if self.parent.proj.proj_params.get("routing_config") is None:
+                log.error("Routing configs was not set. Can not run with routing.")
+                return
+            routing_configs = self.parent.proj.proj_params["routing_config"]
+            rout_data = load_rout_data(routing_configs["rout_data_file"])
+            run_range = rout_data["basin"]
+
+            param_file = self.parent.proj.global_params["param_file"]
+            set_nc_value(param_file, "run_cell", 0)
+            set_nc_value(param_file, "run_cell", 1, mask=run_range)
 
         log.info("VIC start to run...")
         self.vic_running = True
@@ -638,8 +653,23 @@ class VicRun(QWidget):
 
         log.info("VIC running complete.")
         if self.rout_cb.isChecked():
-            pass
-        log.info("Routing complete.")
+            vic_out_file = routing_configs["vic_out_file"]
+            domain_file = routing_configs["domain_file"]
+            symd = routing_configs["start_date"]
+            eymd = routing_configs["end_date"]
+            out_dir = routing_configs["rout_output_dir"]
+            runoffs = confluence(vic_out_file, rout_data, domain_file,
+                                 dt(symd[0], symd[1], symd[2]), dt(eymd[0], eymd[1], eymd[2]))
+            runoffs_m = gather_to_month(runoffs)
+            try:
+                os.makedirs(out_dir)
+            except Exception:
+                pass
+
+            stn_name = rout_data["name"]
+            write_runoff_data(runoffs, join(out_dir, stn_name + "_daily.txt"))
+            write_runoff_data(runoffs_m, join(out_dir, stn_name + "_monthly.txt"))
+            log.info("Routing complete.")
 
     def start_vic(self):
         self.vic_run_thread.start()
@@ -687,6 +717,18 @@ class VicRun(QWidget):
             self.rout_cb.setCheckState(Qt.Checked)
         else:
             self.rout_cb.setCheckState(Qt.Unchecked)
+
+    ###########################################################################
+    # Read in run range of VIC gridcells, first try to read from rout data file,
+    # if fail read as simple ascii data file.
+    ###########################################################################
+    def get_run_range(self, run_range_file):
+        try:
+            may_rout_data = load_rout_data(run_range_file)
+            run_range = may_rout_data["basin"]
+        except:
+            run_range = np.loadtxt(run_range_file)
+        return run_range
 
 
 class VICRunThread(QThread):
@@ -1009,6 +1051,7 @@ class Calibrater(QWidget):
         self.obs_start_date_de = QDateTimeEdit()
         self.obs_start_date_de.setDisplayFormat("yyyy-MM-dd")
         self.time_scale_le = QLineEdit()
+        self.time_scale_le.setFixedWidth(48)
 
         self.calib_range_cb = QCheckBox("Use other calibrate range (default basin)")
         self.calib_range_le = QLineEdit()
@@ -1063,42 +1106,42 @@ class Calibrater(QWidget):
         setting_group.setTitle("Calibrate configs")
         setting_layout = QGridLayout()
         setting_group.setLayout(setting_layout)
-        setting_layout.addWidget(QLabel("Parameters file:"), 0, 0, 1, 2)
-        setting_layout.addWidget(self.param_file_le, 0, 2, 1, 6)
+        setting_layout.addWidget(QLabel("Parameters file:"), 0, 0, 1, 1)
+        setting_layout.addWidget(self.param_file_le, 0, 1, 1, 7)
         setting_layout.addWidget(self.param_file_btn, 0, 8, 1, 1)
 
-        setting_layout.addWidget(QLabel("Observation runoff file:"), 1, 0, 1, 2)
-        setting_layout.addWidget(self.obs_runoff_file_le, 1, 2, 1, 6)
+        setting_layout.addWidget(QLabel("Observation runoff file:"), 1, 0, 1, 1)
+        setting_layout.addWidget(self.obs_runoff_file_le, 1, 1, 1, 7)
         setting_layout.addWidget(self.obs_runoff_file_btn, 1, 8, 1, 1)
 
-        setting_layout.addWidget(QLabel("Obs runoff start time"), 2, 0, 1, 2)
-        setting_layout.addWidget(self.obs_start_date_de, 2, 2, 1, 2)
-        setting_layout.addWidget(QLabel("Time scale (M ro D):"), 2, 5, 1, 2)
-        setting_layout.addWidget(self.time_scale_le, 2, 7, 1, 1)
+        setting_layout.addWidget(QLabel("Obs runoff start time"), 2, 0, 1, 1)
+        setting_layout.addWidget(self.obs_start_date_de, 2, 1, 1, 2)
+        setting_layout.addWidget(QLabel("Time scale (M ro D):"), 2, 3, 1, 4)
+        setting_layout.addWidget(self.time_scale_le, 2, 6, 1, 1)
 
         setting_layout.addWidget(QLabel("VIC start time:"), 3, 0, 1, 1)
-        setting_layout.addWidget(self.start_date_de, 3, 1, 1, 1)
-        setting_layout.addWidget(QLabel("Calibrate start time:"), 3, 2, 1, 2)
-        setting_layout.addWidget(self.calib_start_date_de, 3, 4, 1, 1)
-        setting_layout.addWidget(QLabel("Calibrate end time:"), 3, 5, 1, 2)
-        setting_layout.addWidget(self.end_date_de, 3, 7, 1, 2)
+        setting_layout.addWidget(self.start_date_de, 3, 1, 1, 2)
+        setting_layout.addWidget(QLabel("Calibrate start time:"), 4, 0, 1, 1)
+        setting_layout.addWidget(self.calib_start_date_de, 4, 1, 1, 2)
+        setting_layout.addWidget(QLabel("Calibrate end time:"), 4, 3, 1, 4)
+        setting_layout.addWidget(self.end_date_de, 4, 6, 1, 1)
 
-        setting_layout.addWidget(self.calib_range_cb, 4, 0, 1, 5)
-        setting_layout.addWidget(QLabel("Calibrate range:"), 5, 0, 1, 1)
-        setting_layout.addWidget(self.calib_range_le, 5, 1, 1, 6)
-        setting_layout.addWidget(self.calib_range_btn, 5, 7, 1, 1)
-        setting_layout.addWidget(QLabel("Bias Propotion Coefficient:"), 6, 0, 1, 2)
-        setting_layout.addWidget(self.bpc_le, 6, 2, 1, 1)
-        setting_layout.addWidget(self.only_bias_cb, 6, 4, 1, 3)
-        setting_layout.addWidget(QLabel("Turns:"), 7, 0, 1, 1)
-        setting_layout.addWidget(self.turns_le, 7, 1, 1, 1)
-        setting_layout.addWidget(QLabel("Max iterations:"), 7, 2, 1, 2)
-        setting_layout.addWidget(self.max_iterate_le, 7, 4, 1, 1)
-        setting_layout.addWidget(QLabel("Toler threshold:"), 7, 5, 1, 2)
-        setting_layout.addWidget(self.toler_threshold_le, 7, 7, 1, 1)
+        setting_layout.addWidget(self.calib_range_cb, 6, 0, 1, 5)
+        setting_layout.addWidget(QLabel("Calibrate range file:"), 7, 0, 1, 1)
+        setting_layout.addWidget(self.calib_range_le, 7, 1, 1, 7)
+        setting_layout.addWidget(self.calib_range_btn, 7, 8, 1, 1)
+        setting_layout.addWidget(QLabel("Bias Propotion Coefficient:"), 8, 0, 1, 2)
+        setting_layout.addWidget(self.bpc_le, 8, 2, 1, 1)
+        setting_layout.addWidget(self.only_bias_cb, 8, 3, 1, 4)
+        setting_layout.addWidget(QLabel("Turns:"), 9, 1, 1, 1)
+        setting_layout.addWidget(self.turns_le, 9, 2, 1, 1)
+        setting_layout.addWidget(QLabel("Max iterations:"), 9, 3, 1, 2)
+        setting_layout.addWidget(self.max_iterate_le, 9, 5, 1, 1)
+        setting_layout.addWidget(QLabel("Toler threshold:"), 9, 6, 1, 1)
+        setting_layout.addWidget(self.toler_threshold_le, 9, 7, 1, 1)
 
-        setting_layout.addWidget(self.apply_configs_btn, 8, 2, 1, 2)
-        setting_layout.addWidget(self.start_btn, 8, 6, 1, 3)
+        setting_layout.addWidget(self.apply_configs_btn, 10, 4, 1, 2)
+        setting_layout.addWidget(self.start_btn, 10, 6, 1, 2)
 
         calib_params_group = QGroupBox()
         calib_params_group.setStyleSheet(group_ss)
@@ -1292,9 +1335,9 @@ class Calibrater(QWidget):
         calib_configs["obs_start_date"] = list(self.start_date_de.date().getDate())
 
         if self.calib_range_cb.isChecked():
-            calib_configs["calib_range"] = unicode(self.calib_range_le.text())
+            calib_configs["calib_range_file"] = unicode(self.calib_range_le.text())
         else:
-            calib_configs["calib_range"] = None
+            calib_configs["calib_range_file"] = None
 
         calib_configs["BPC"] = float(self.bpc_le.text())
         calib_configs["only_bias"] = True if self.only_bias_cb.isChecked() else False
