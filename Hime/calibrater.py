@@ -159,7 +159,9 @@ def calibrate(proj, calib_configs):
 
     calib_range = calib_configs["rout_data"]["basin"]\
         if calib_configs.get("calib_range_file") is None \
-        else np.loadtxt(calib_configs.get("calib_range_file"), dtype=int, delimiter=r"[/s,]")
+        else np.array(pd.read_table(calib_configs.get("calib_range_file"), header=None, sep="[\s,]"), dtype=int)
+    # Fucking np not support regex for delimiter and force me to use such a ugly method.
+
     calib_configs["calib_range"] = calib_range
 
     turns = calib_configs["turns"]

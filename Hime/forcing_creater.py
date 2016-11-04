@@ -31,7 +31,7 @@ from Hime.utils import read_template
 from Hime.version import version as __version__
 
 try:
-    from Hime.lib.idw import idw
+    from idw import idw
 except ImportError:
     from Hime.interpolate import idw
     print 'Warning: C function of IDW imported failed.'
