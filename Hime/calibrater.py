@@ -54,34 +54,34 @@ from Hime.vic_execer import vic_exec
 # Run vic and routing and return a accuracy index of the simulation.
 #
 ########################################################################################################################
-def vic_try(calib_params):
-    time_scale = calib_params["time_scale"]
+def vic_try(calib_configs):
+    time_scale = calib_configs["time_scale"]
 
-    global_file = calib_params["global_file"]
-    domain_file = calib_params["domain_file"]
-    vic_out_file = calib_params["vic_out_file"]
+    global_file = calib_configs["global_file"]
+    domain_file = calib_configs["domain_file"]
+    vic_out_file = calib_configs["vic_out_file"]
 
-    ymd = calib_params["obs_start_date"]
+    ymd = calib_configs["obs_start_date"]
     obs_start_date = datetime(ymd[0], ymd[1], ymd[2])
 
-    ymd = calib_params["start_date"]
+    ymd = calib_configs["start_date"]
     start_date = datetime(ymd[0], ymd[1], ymd[2])
 
-    ymd = calib_params["calib_start_date"]
+    ymd = calib_configs["calib_start_date"]
     calib_start_date = datetime(ymd[0], ymd[1], ymd[2])
 
-    ymd = calib_params["end_date"]
+    ymd = calib_configs["end_date"]
     end_date = datetime(ymd[0], ymd[1], ymd[2])
 
-    driver = calib_params["driver_path"]
-    mpi = calib_params["mpi"]
-    ncores = calib_params["ncores"]
+    driver = calib_configs["driver_path"]
+    mpi = calib_configs["mpi"]
+    ncores = calib_configs["ncores"]
 
-    BPC = calib_params["BPC"]
-    only_bias = calib_params["only_bias"]
+    BPC = calib_configs["BPC"]
+    only_bias = calib_configs["only_bias"]
 
-    rout_data = calib_params["rout_data"]
-    obs_data = calib_params["obs_data"]
+    rout_data = calib_configs["rout_data"]
+    obs_data = calib_configs["obs_data"]
 
     # Load observation runoff data
     obs = obs_data
@@ -148,6 +148,7 @@ def vic_try_with_param(calib_configs, var_id, value):
 ########################################################################################################################
 def calibrate(proj, calib_configs):
     params_file = calib_configs["params_file"]
+    domain_file = calib_configs["domain_file"]
 
     start_date = calib_configs["start_date"]
     end_date = calib_configs["end_date"]
@@ -170,8 +171,8 @@ def calibrate(proj, calib_configs):
     BPC = calib_configs["BPC"]
 
     # Set run area.
-    set_nc_value(params_file, "run_cell", 0)
-    set_nc_value(params_file, "run_cell", 1, mask=calib_range)
+    set_nc_value(domain_file, "mask", 0)
+    set_nc_value(domain_file, "mask", 1, mask=calib_range)
 
     ###########################################################################
     # Create a single global file for calibration.
@@ -343,5 +344,5 @@ def calibrate(proj, calib_configs):
 #
 ########################################################################################################################
 def order(array):
-    return list(pd.DataFrame(array).sort(0).index)
+    return list(pd.DataFrame(array).sort_values(by=0).index)
 

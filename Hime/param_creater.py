@@ -348,7 +348,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
     domain_vars = params_tem["domain"]
     fract_file = creater_params["fract_file"]
 
-    value = np.zeros(nx * ny)
+    value = np.ones(nx * ny) * -9999
     for domain_var in domain_vars:
         varname = domain_var["variable"]
         if domain_var["format"] == "int":
@@ -362,7 +362,8 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
             dim = ("lat",)
         else:
             dim = ("lat", "lon")
-        v = domain.createVariable(varname, datatype, dim, fill_value = 0)
+
+        v = domain.createVariable(varname, datatype, dim, fill_value=-9999)
         v.units = domain_var["units"]
         v.long_name = domain_var["long_name"]
 
@@ -379,7 +380,7 @@ def create_params_file(creater_params, out_params_path=None, out_domain_path=Non
                     raise ValueError("Size of fraction file grid is not suit.")
                 v[:] = fract.value
             else:
-                value[sn] = np.zeros(ncell) +1.0
+                value[sn] = np.zeros(ncell) + 1.0
                 v[:] = value
         if varname == "mask":
             value[sn] = np.zeros(ncell) + 1

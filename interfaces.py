@@ -637,7 +637,7 @@ class VicRun(QWidget):
         status, logs_out, logs_err = vic_exec(vic_path, global_file, mpi=use_mpi, n_cores=n_cores)
 
         vic_logs = []
-        for line in logs_out:
+        for line in logs_out[-1024:]:
             vic_logs.append(line)
         for line in logs_err:
             vic_logs.append(line)
