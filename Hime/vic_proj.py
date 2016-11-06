@@ -223,7 +223,6 @@ class VicProj(object):
         out_lines.append("JULY_TAVG_SUPPLIED %s" % glo_prm["july_tavg"])
         out_lines.append("ORGANIC_FRACT %s" % glo_prm["organic_fract"])
         out_lines.append("LAI_SRC %s" % glo_prm["LAI_src"])
-        out_lines.append("NLAYER %d" % glo_prm["nlayer"])
         out_lines.append("NODES %d" % glo_prm["nodes"])
         out_lines.append("")
 

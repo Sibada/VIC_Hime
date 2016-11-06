@@ -286,8 +286,9 @@ def load_rout_data(file_path):
 
 
 def write_rout_data(rout_data, out_file):
-    rout_data["basin"] = list(rout_data["basin"])
-    rout_data["uh_cell"] = list(rout_data["uh_cell"])
+    rout_data["basin"] = rout_data["basin"].tolist()
+    rout_data["sn"] = rout_data["sn"].tolist()
+    rout_data["uh_cell"] = rout_data["uh_cell"].tolist()
     rout_json = json.dumps(rout_data)
     df = open(out_file, "w")
     df.writelines(rout_json)
