@@ -171,8 +171,9 @@ def calibrate(proj, calib_configs):
     BPC = calib_configs["BPC"]
 
     # Set run area.
+    run_range = calib_configs["rout_data"]["basin"]
     set_nc_value(domain_file, "mask", 0)
-    set_nc_value(domain_file, "mask", 1, mask=calib_range)
+    set_nc_value(domain_file, "mask", 1, mask=run_range)
 
     ###########################################################################
     # Create a single global file for calibration.
