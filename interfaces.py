@@ -432,21 +432,33 @@ class GlobalConfig(QWidget):
         log.info("Configs has been applied.")
 
     def set_file_by_dialog(self, line_edit, disc):
-        file = QFileDialog.getOpenFileName(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        file = QFileDialog.getOpenFileName(self, disc, ddir)
         log.debug("Get file: %s" % file)
         if file == "":
             return
         line_edit.setText(file)
 
     def set_dir_by_dialog(self, line_edit, disc):
-        dir = QFileDialog.getExistingDirectory(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        dir = QFileDialog.getExistingDirectory(self, disc, ddir)
         log.debug("Get dir: %s" % dir)
         if dir == "":
             return
         line_edit.setText(dir)
 
     def set_forcing_path(self):
-        forcing_file = QFileDialog.getOpenFileName(self, "Set forcing files")
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        forcing_file = QFileDialog.getOpenFileName(self, "Set forcing files", ddir)
         log.debug("Get file: %s" % forcing_file)
         if forcing_file == "":
             return
@@ -589,14 +601,22 @@ class VicRun(QWidget):
         self.vic_run_thread = VICRunThread(self)
 
     def set_file_by_dialog(self, line_edit, disc):
-        file = QFileDialog.getOpenFileName(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        file = QFileDialog.getOpenFileName(self, disc, ddir)
         log.debug("Open file: %s" % file)
         if file == "":
             return
         line_edit.setText(file)
 
     def set_dir_by_dialog(self, line_edit, disc):
-        dir = QFileDialog.getExistingDirectory(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        dir = QFileDialog.getExistingDirectory(self, disc, ddir)
         log.debug("Open directory: %s" % dir)
         if dir == "":
             return
@@ -621,9 +641,9 @@ class VicRun(QWidget):
             rout_data = load_rout_data(routing_configs["rout_data_file"])
             run_range = rout_data["basin"]
 
-            param_file = self.parent.proj.global_params["param_file"]
-            set_nc_value(param_file, "run_cell", 0)
-            set_nc_value(param_file, "run_cell", 1, mask=run_range)
+            domain_file = self.parent.proj.global_params["domain_file"]
+            set_nc_value(domain_file, "mask", 0)
+            set_nc_value(domain_file, "mask", 1, mask=run_range)
 
         log.info("VIC start to run...")
         self.vic_running = True
@@ -908,14 +928,22 @@ class Routing(QWidget):
         self.configs = None
 
     def set_file_by_dialog(self, line_edit, disc):
-        file = QFileDialog.getOpenFileName(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        file = QFileDialog.getOpenFileName(self, disc, ddir)
         log.debug("Open file: %s" % file)
         if file == "":
             return
         line_edit.setText(file)
 
     def set_dir_by_dialog(self, line_edit, disc):
-        dir = QFileDialog.getExistingDirectory(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        dir = QFileDialog.getExistingDirectory(self, disc, ddir)
         log.debug("Open directory: %s" % dir)
         if dir == "":
             return
@@ -1179,14 +1207,22 @@ class Calibrater(QWidget):
         self.calibrate_thread = CalibrateThread(self)
 
     def set_file_by_dialog(self, line_edit, disc):
-        file = QFileDialog.getOpenFileName(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        file = QFileDialog.getOpenFileName(self, disc, ddir)
         log.debug("Open file: %s" % file)
         if file == "":
             return
         line_edit.setText(file)
 
     def set_dir_by_dialog(self, line_edit, disc):
-        dir = QFileDialog.getExistingDirectory(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        dir = QFileDialog.getExistingDirectory(self, disc, ddir)
         log.debug("Open directory: %s" % dir)
         if dir == "":
             return
@@ -1564,14 +1600,22 @@ class ForcingCreater(QWidget):
         self.create_forcing = True
 
     def set_file_by_dialog(self, line_edit, disc):
-        file = QFileDialog.getOpenFileName(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        file = QFileDialog.getOpenFileName(self, disc, ddir)
         log.debug("Get file: %s" % file)
         if file == "":
             return
         line_edit.setText(file)
 
     def set_dir_by_dialog(self, line_edit, disc):
-        dir = QFileDialog.getExistingDirectory(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        dir = QFileDialog.getExistingDirectory(self, disc, ddir)
         log.debug("Get dir: %s" % dir)
         if dir == "":
             return
@@ -1904,14 +1948,22 @@ class ParamsCreater(QWidget):
         self.create_thread = ParamsCreateThread(self)
 
     def set_file_by_dialog(self, line_edit, disc):
-        file = QFileDialog.getOpenFileName(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        file = QFileDialog.getOpenFileName(self, disc, ddir)
         log.debug("Get file: %s" % file)
         if file == "":
             return
         line_edit.setText(file)
 
     def set_dir_by_dialog(self, line_edit, disc):
-        dir = QFileDialog.getExistingDirectory(self, disc)
+        ddir = os.path.expanduser('~')
+        if self.parent.proj is not None:
+            ddir = self.parent.proj.proj_params["proj_path"]
+
+        dir = QFileDialog.getExistingDirectory(self, disc, ddir)
         log.debug("Get dir: %s" % dir)
         if dir == "":
             return

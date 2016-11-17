@@ -44,31 +44,33 @@ def xy_to_sn(x, y, nx=None, ny=None):
 ########################################################################################################################
 def set_nc_value(nc_file, variable, value, mask=None, dim=None):
     ncf = nc.Dataset(nc_file, "a")
+    try:
 
-    var = ncf.variables[variable]
-    varv = var
-    if dim is not None:
-        if type(dim) == int or type(dim) == float:
-            varv = varv[dim]
+        var = ncf.variables[variable]
+        varv = var
+        if dim is not None:
+            if type(dim) == int or type(dim) == float:
+                varv = varv[dim]
+            else:
+                raise ValueError("dims should be a number.")
+
+        val = np.array(varv[:])
+        val_mask = np.zeros_like(val, dtype="int32")
+
+        if mask is None:
+            val_mask[val != -9999] = 1
         else:
-            raise ValueError("dims should be a number.")
+            for cr in mask:
+                val_mask[cr[1], cr[0]] = 1
 
-    val = np.array(varv[:])
-    val_mask = np.zeros_like(val, dtype="int32")
+        val[val_mask > 0] = value
+        if dim is not None:
+            var[dim, :] = val
+        else:
+            var[:] = val
 
-    if mask is None:
-        val_mask[val != -9999] = 1
-    else:
-        for cr in mask:
-            val_mask[cr[1], cr[0]] = 1
-
-    val[val_mask > 0] = value
-    if dim is not None:
-        var[dim, :] = val
-    else:
-        var[:] = val
-
-    ncf.close()
+    finally:
+        ncf.close()
 
 
 

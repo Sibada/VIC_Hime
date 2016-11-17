@@ -23,8 +23,6 @@ class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
 
-        self.proj = None
-
         new_proj_action = self.createAction("&New project", self.create_proj,
                                             QKeySequence.New, None, "Create an new project")
 
@@ -101,6 +99,7 @@ class MainWindow(QMainWindow):
         #######################################################################
         # Business configs.
         #######################################################################
+        self.proj = None
 
         self.dirty = False
 
@@ -199,8 +198,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.base_window_title + " - " + self.proj.proj_params["proj_name"])
 
     def open_proj(self):
-        proj_file = QFileDialog.getOpenFileName(self, "Select project file.",
-                                                "VIC project files (*.vic_proj);All Files (*)")
+        proj_file = QFileDialog.getOpenFileName(self, "Select project file.", os.path.expanduser('~'),
+                                                "VIC project files (*.vic_proj);;All Files (*)")
         self.load_proj(proj_file)
 
     def save_proj(self):
@@ -224,7 +223,7 @@ class MainWindow(QMainWindow):
 
     def ok_to_exist(self):
         if self.dirty:
-            reply = QMessageBox.question(self, "VIC Hime: Unsaved Changes","Save unsaved changes?",
+            reply = QMessageBox.question(self, "VIC Hime: Unsaved Changes", "Save unsaved changes?",
                             QMessageBox.Yes|QMessageBox.No|QMessageBox.Cancel)
             if reply == QMessageBox.Cancel:
                 return False
@@ -265,6 +264,7 @@ class CreateProjDialog(QDialog):
 
         proj_dir_lb = QLabel("&Project path:")
         self.proj_dir_le = QLineEdit()
+        self.proj_dir_le.setText(os.path.expanduser('~'))
         proj_dir_lb.setBuddy(self.proj_dir_le)
 
         proj_dir_btn = QPushButton("...")
@@ -290,13 +290,14 @@ class CreateProjDialog(QDialog):
         self.connect(btn_box, SIGNAL("rejected()"), self, SLOT("reject()"))
 
     def select_file(self):
-        self.proj_dir_le.setText(QFileDialog.getExistingDirectory(self, "Select dir"))
+        self.proj_dir_le.setText(QFileDialog.getExistingDirectory(self, "Select dir", os.path.expanduser('~')))
 
 
 class StreamEmitter(QObject):
     text_written = pyqtSignal(str)
     def write(self, text):
         self.text_written.emit(str(text))
+
 
 def main():
     app = QApplication(sys.argv)
