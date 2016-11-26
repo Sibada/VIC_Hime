@@ -28,17 +28,25 @@ def idw(np.ndarray[np.float64_t, ndim=2] data, np.ndarray[np.float64_t, ndim=2] 
     cdef double minw
 
     cdef double dp
+    cdef double dis2
 
     cdef double value = 0.0
     cdef double value_b = 0.0
     cdef np.float64_t itpv
 
-    cdef int c, s, d, i, j, key, p
+    cdef int c, s, d, i, j, key, p, ss
 
     for c in range(ngrids):
         cx = grids[c, 0]
         cy = grids[c, 1]
         for s in range(nstns):
+            dis2 = (cx - coords[s, 0]) * (cx - coords[s, 0]) + \
+                   (cy - coords[s, 1]) * (cy - coords[s, 1])
+            if dis2 <= 1e-10:
+                for ss in range(nstns):
+                    weight[ss] = 0.0
+                weight[s] = 1.0
+                break
             weight[s] = 1.0 / ((cx - coords[s, 0]) * (cx - coords[s, 0]) +
                                (cy - coords[s, 1]) * (cy - coords[s, 1]))
 

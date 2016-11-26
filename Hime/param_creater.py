@@ -418,8 +418,8 @@ def make_grid(lon, lat, dec):
     if nrow > 1:
         ydivs = lat_uni[1:nrow] - lat_uni[0:nrow - 1]
 
-    if ncol > 1 and np.unique(xdivs) > 1 or nrow > 1 and np.unique(ydivs) > 1:
-        raise ValueError("Coordinates of cells are not standard coordinates of grid.")
+    #if ncol > 1 and len(np.unique(xdivs)) > 1 or nrow > 1 and len(np.unique(ydivs)) > 1:
+    #    raise ValueError("Coordinates of cells are not standard coordinates of grid.")
 
     if ncol > 1:
         cellsize = xdivs[0]

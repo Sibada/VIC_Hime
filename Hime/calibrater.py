@@ -176,7 +176,7 @@ def calibrate(proj, calib_configs):
     set_nc_value(domain_file, "mask", 1, mask=run_range)
 
     ###########################################################################
-    # Create a single global file for calibration.
+    # Create a single global file specially for calibration.
     ###########################################################################
     proj_calib = copy.deepcopy(proj)
     proj_path = proj_calib.proj_params["proj_path"]
@@ -196,6 +196,7 @@ def calibrate(proj, calib_configs):
                     "OUT_BASEFLOW"]
     })
     proj_calib.global_params["out_file"] = [out_file_calib]
+    proj_calib.global_params["param_file"] = calib_configs["domain_file"]
 
     global_file = proj_path + "global_calibrate.txt"
     vic_out_file = "%sfor_calibrate.%04d-%02d-%02d.nc" % (proj_path,

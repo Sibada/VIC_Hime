@@ -123,8 +123,10 @@ def read_stn_data(forcing_params):
 
         ts = pd.date_range(sh_start_time, periods=sh.shape[0], freq=freq)
         sh = sh[ts >= start_time]
+
         temp = temp[ts >= start_time]
         vp = vp[ts >= start_time]
+        ts = ts[:sh.shape[0]]
 
         swdown = np.ndarray(sh.shape)
         lwdown = np.ndarray(sh.shape)
@@ -208,9 +210,11 @@ def create_forcing(forcing_data, create_params):
     nlat = domain.dimensions['lat'].size
     lons = np.array(domain["lon"])
     lats = np.array(domain["lat"])
-    fv = domain["mask"]._FillValue
+    fv = int(domain["mask"]._FillValue)
     mask = np.array(domain["mask"])
-    mask[mask == fv], mask[mask != fv] = 0, 1
+
+    to0, to1 = mask == fv, mask != fv
+    mask[to0], mask[to1] = 0, 1
     domain.close()
 
     # Get coordinates of grids to be interpolated.
@@ -218,7 +222,7 @@ def create_forcing(forcing_data, create_params):
     for r in range(mask.shape[0]):
         for c in range(mask.shape[1]):
             s += 1
-            if mask[r, c] == 0:
+            if mask[r, c] <= 0:
                 continue
             sn.append(s)
             grid_lons.append(lons[c])
