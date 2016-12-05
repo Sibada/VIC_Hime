@@ -14,7 +14,6 @@ Yang H, Huafang L V, Qingfang H U, et al. Comparison of parametrization methods 
 radiation over the North China Plain[J]. Qinghua Daxue Xuebao/journal of Tsinghua University, 2014, 54(5):590-595.
 """
 
-import datetime as dt
 import functools
 from collections import OrderedDict
 from math import pi
@@ -248,73 +247,73 @@ def create_forcing(forcing_data, create_params):
         nc_file_name = "%s%d.nc" % (forcing_path, year)
 
         # ######################################## Create and open netCDF file.
-        ff = nc.Dataset(nc_file_name, "w", "NETCDF4")
-        ff.description = "VIC parameter file created by VIC Hime " + __version__ + " at " +\
-                         dt.datetime.now().strftime('%Y-%m-%d, %H:%M:%S')
+        with nc.Dataset(nc_file_name, "w", "NETCDF4") as ff:
 
-        log.info(nc_file_name + " has been created to write.")
+            ff.description = "VIC parameter file created by VIC Hime " + __version__ + " at " +\
+                             dt.datetime.now().strftime('%Y-%m-%d, %H:%M:%S')
 
-        ff.createDimension("lon", nlon)
-        ff.createDimension("lat", nlat)
-        ff.createDimension("time", time_len)
+            log.info(nc_file_name + " has been created to write.")
 
-        v = ff.createVariable("lon", "f8", ("lon",))
-        v[:] = lons
-        v.standard_name = "longitude"
-        v.units = "degrees_east"
-        v.axis = "X"
+            ff.createDimension("lon", nlon)
+            ff.createDimension("lat", nlat)
+            ff.createDimension("time", time_len)
 
-        v = ff.createVariable("lat", "f8", ("lat",))
-        v[:] = lats
-        v.standard_name = "latitude"
-        v.units = "degrees_north"
-        v.axis = "Y"
+            v = ff.createVariable("lon", "f8", ("lon",))
+            v[:] = lons
+            v.standard_name = "longitude"
+            v.units = "degrees_east"
+            v.axis = "X"
 
-        v = ff.createVariable("time", "i4", ("time",))
-        v[:] = range(time_len)
-        v.units = "%s since %s" % (time_step, since)
-        v.calendar = "proleptic_gregorian"
+            v = ff.createVariable("lat", "f8", ("lat",))
+            v[:] = lats
+            v.standard_name = "latitude"
+            v.units = "degrees_north"
+            v.axis = "Y"
 
-        v = ff.createVariable("mask", "f8", ("lat", "lon"), fill_value=0.0)
-        v[:] = mask
-        v.long_name = "fraction of grid cell that is active domain mask."
-        v.comment = "0 value indicates cell is not active."
+            v = ff.createVariable("time", "i4", ("time",))
+            v[:] = range(time_len)
+            v.units = "%s since %s" % (time_step, since)
+            v.calendar = "proleptic_gregorian"
 
-        forc_tem = read_template(templates_path + "/forc_file.template")
-        #######################################################################
-        # Write in atmospheric data.
-        #######################################################################
-        for variable in forcing_data["variables"]:
-            var_name = variable["var_name"]
-            data = variable["data"]
-            coords = variable["coords"]
-            var_type = variable["type"]
-            itp_params = variable["itp_params"]
-            v = ff.createVariable(var_name, "f8", ("time", "lat", "lon"), fill_value=-9999)
+            v = ff.createVariable("mask", "f8", ("lat", "lon"), fill_value=0.0)
+            v[:] = mask
+            v.long_name = "fraction of grid cell that is active domain mask."
+            v.comment = "0 value indicates cell is not active."
 
-            if forc_tem.get(var_type) is not None:
-                v.units = forc_tem.get(var_type)[0]
-                v.long_name = forc_tem.get(var_type)[1]
+            forc_tem = read_template(templates_path + "/forc_file.template")
+            #######################################################################
+            # Write in atmospheric data.
+            #######################################################################
+            for variable in forcing_data["variables"]:
+                var_name = variable["var_name"]
+                data = variable["data"]
+                coords = variable["coords"]
+                var_type = variable["type"]
+                itp_params = variable["itp_params"]
+                v = ff.createVariable(var_name, "f8", ("time", "lat", "lon"), fill_value=-9999)
 
-            # Interpolation
-            try:
-                idp = float(itp_params[0])
-            except Exception:
-                idp = 2.0
-            try:
-                maxd = float(itp_params[1])
-            except Exception:
-                maxd = -1.0
-            try:
-                maxp = int(itp_params[2])
-            except Exception:
-                maxp = -1
+                if forc_tem.get(var_type) is not None:
+                    v.units = forc_tem.get(var_type)[0]
+                    v.long_name = forc_tem.get(var_type)[1]
 
-            itp_data = idw(data[in_this_year], coords, grid_coords, idp=idp, maxd=maxd, maxp=maxp)
-            values = np.zeros((time_len, mask.shape[0] * mask.shape[1])) - 9999.0
-            values[:, sn] = itp_data
-            v[:] = values
+                # Interpolation
+                try:
+                    idp = float(itp_params[0])
+                except Exception:
+                    idp = 2.0
+                try:
+                    maxd = float(itp_params[1])
+                except Exception:
+                    maxd = -1.0
+                try:
+                    maxp = int(itp_params[2])
+                except Exception:
+                    maxp = -1
 
-        ff.close()
+                itp_data = idw(data[in_this_year], coords, grid_coords, idp=idp, maxd=maxd, maxp=maxp)
+                values = np.zeros((time_len, mask.shape[0] * mask.shape[1])) - 9999.0
+                values[:, sn] = itp_data
+                v[:] = values
+
     log.info("Forcing file creating completed.")
 

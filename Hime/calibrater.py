@@ -196,7 +196,7 @@ def calibrate(proj, calib_configs):
                     "OUT_BASEFLOW"]
     })
     proj_calib.global_params["out_file"] = [out_file_calib]
-    proj_calib.global_params["param_file"] = calib_configs["domain_file"]
+    proj_calib.global_params["param_file"] = calib_configs["params_file"]
 
     global_file = proj_path + "global_calibrate.txt"
     vic_out_file = "%sfor_calibrate.%04d-%02d-%02d.nc" % (proj_path,
