@@ -1936,6 +1936,8 @@ class ParamsCreater(QWidget):
                      lambda: self.set_file_by_dialog(line_edit=self.veg_params_le, disc="Set veg params file"))
         self.connect(self.veg_lib_btn, SIGNAL("clicked()"),
                      lambda: self.set_file_by_dialog(line_edit=self.veg_lib_le, disc="Set veg lib file"))
+        self.connect(self.fract_file_btn, SIGNAL("clicked()"),
+                     lambda: self.set_file_by_dialog(line_edit=self.fract_file_le, disc="Set fraction file"))
         self.connect(self.params_out_path_btn, SIGNAL("clicked()"),
                      lambda: self.set_dir_by_dialog(line_edit=self.params_out_path_le, disc="Set parameters files output path"))
 
@@ -2045,7 +2047,7 @@ class ParamsCreater(QWidget):
     def create_parameters_file(self):
         creater_params = OrderedDict()
         creater_params["soil_file"] = unicode(self.soil_file_le.text())
-        creater_params["fract_file"] = None
+        creater_params["fract_file"] = unicode(self.fract_file_le.text())
         creater_params["snow_band"] = int(unicode(self.snow_bands_le.text()))
         creater_params["n_layer"] = int(unicode(self.layers_le.text()))
         creater_params["organic"] = False

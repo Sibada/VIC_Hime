@@ -419,13 +419,13 @@
     "domain": [
         {
             "variable": "lon", 
-            "units": "degrees_north", 
+            "units": "degrees_east",
             "format": "double", 
             "long_name": "latitude of grid cell center"
         },
         {
             "variable": "lat", 
-            "units": "degrees_south", 
+            "units": "degrees_north",
             "format": "double", 
             "long_name": "longtitude of grid cell center"
         },
