@@ -1368,7 +1368,7 @@ class Calibrater(QWidget):
         calib_configs["vic_out_file"] = ""
         calib_configs["time_scale"] = unicode(self.time_scale_le.text())
         calib_configs["obs_data_file"] = unicode(self.obs_runoff_file_le.text())
-        calib_configs["obs_start_date"] = list(self.start_date_de.date().getDate())
+        calib_configs["obs_start_date"] = list(self.obs_start_date_de.date().getDate())
 
         if self.calib_range_cb.isChecked():
             calib_configs["calib_range_file"] = unicode(self.calib_range_le.text())
