@@ -160,7 +160,7 @@ def calibrate(proj, calib_configs):
 
     calib_range = calib_configs["rout_data"]["basin"]\
         if calib_configs.get("calib_range_file") is None \
-        else np.array(pd.read_table(calib_configs.get("calib_range_file"), header=None, sep="[\s,]"), dtype=int)
+        else np.array(pd.read_table(calib_configs.get("calib_range_file"), header=None, sep="[\s,]"), dtype=int) - 1
     # Fucking np not support regex for delimiter and force me to use such a ugly method.
 
     calib_configs["calib_range"] = calib_range
@@ -227,7 +227,8 @@ def calibrate(proj, calib_configs):
     for t in range(turns):
         turn = t + 1
         log.info("Turns %d:" % turn)
-        for p in range(6):
+        p_seq = range(6)
+        for p in p_seq:
             param_name = param_names[p]
             log.info("Calibrate %s:" % param_name)
 
@@ -274,7 +275,7 @@ def calibrate(proj, calib_configs):
                         if lcb[p] > -1 and x[0] < lcb[p]:
                             x[0] = lcb[p]
                         elif lob[p] > -1 and x[0] <= lob[p]:
-                            x[0] = x[1] - 0.618 * (x[1]-lob)
+                            x[0] = x[1] - 0.618 * (x[1]-lob[p])
 
                         rs[0] = vic_try_with_param(calib_configs, p, x[0])
 
