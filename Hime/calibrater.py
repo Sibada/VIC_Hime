@@ -254,7 +254,7 @@ def calibrate(proj, calib_configs):
             step_r = rs[od[0]]
             de = es[od[2]] - es[od[0]]
 
-            itr = 1  # Iteration times of single parameter.
+            itr = 2  # Iteration times of single parameter.
             while de >= toler:
                 if es[1] < es[0] and es[1] < es[2]:
                     x[0] = (x[0] + x[1])/2
@@ -263,7 +263,7 @@ def calibrate(proj, calib_configs):
                     rs[2] = vic_try_with_param(calib_configs, p, x[2])
 
                 elif es[0] < es[1] < es[2]:
-                    if lcb[p] > 0 and x[0] == lcb[p]:
+                    if lcb[p] > -1 and x[0] == lcb[p]:
                         x[2], rs[2] = x[1], rs[1]
                         x[1] = (x[2] + x[0])/2
                         rs[1] = vic_try_with_param(calib_configs, p, x[1])
@@ -271,15 +271,15 @@ def calibrate(proj, calib_configs):
                         x[2], x[1], x[0] = x[1], x[0], x[0]-(x[2]-x[0])/2
                         rs[2], rs[1] = rs[1], rs[0]
 
-                        if lcb[p] > 0 and x[0] < lcb[p]:
+                        if lcb[p] > -1 and x[0] < lcb[p]:
                             x[0] = lcb[p]
-                        elif lob[p] > 0 and x[0] <= lob[p]:
+                        elif lob[p] > -1 and x[0] <= lob[p]:
                             x[0] = x[1] - 0.618 * (x[1]-lob)
 
                         rs[0] = vic_try_with_param(calib_configs, p, x[0])
 
                 elif es[0] > es[1] > es[2]:
-                    if rcb[p] > 0 and x[2] == rcb[p]:
+                    if rcb[p] > -1 and x[2] == rcb[p]:
                         x[0], rs[0] = x[1]. rs[1]
                         x[1] = (x[2] + x[0])/2
                         rs[1] = vic_try_with_param(calib_configs, p, x[1])
@@ -287,9 +287,9 @@ def calibrate(proj, calib_configs):
                         x[0], x[1], x[2] = x[1], x[2], x[2]+(x[2]-x[0])/2
                         rs[0], rs[1] = rs[1], rs[2]
 
-                        if x[2] > rcb[p] > 0:
+                        if x[2] > rcb[p] > -1:
                             x[2] = lcb[p]
-                        elif x[2] >= rob[p] > 0:
+                        elif x[2] >= rob[p] > -1:
                             x[2] = x[1] + 0.618 * (rob[p]-x[1])
 
                         rs[2] = vic_try_with_param(calib_configs, p, x[2])
