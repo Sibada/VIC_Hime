@@ -62,6 +62,18 @@ def read_stn_data(forcing_params):
     freq = forcing_params["freq"]
     use_sh = forcing_params["use_sh"]
 
+    #if forcing_params["a_s"] is None:
+    #    a_s = 0.25
+    #else:
+    #    a_s = forcing_params["a_s"]
+
+    #if forcing_params["b_s"] is None:
+    #    b_s = 0.50
+    #else:
+    #    a_s = forcing_params["b_s"]
+    a_s = 0.1413
+    b_s = 0.5744
+
     # ###################################################################################
     #
     # Read atmospheric data.
@@ -129,8 +141,6 @@ def read_stn_data(forcing_params):
 
         swdown = np.ndarray(sh.shape)
         lwdown = np.ndarray(sh.shape)
-
-        a_s, b_s = 0.25, 0.50
 
         J = np.array([float(date.strftime("%j")) for date in ts])
         delta = 0.408 * np.sin(2*pi*J/365-1.39)

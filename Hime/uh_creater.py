@@ -213,8 +213,8 @@ def create_uh_cell(basin, station, uh_m, next_x, next_y, uh_slope):
         i += 1
 
         # Log when complete 10 percent.
-        if i % (len(basin)/10) == 0:
-            log.info("Cell %d dealed." % i)
+        # if i % (len(basin)/10) == 0:
+        #    log.info("Cell %d dealed." % i)
 
     return uh_cell
 

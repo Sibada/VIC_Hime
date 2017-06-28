@@ -27,7 +27,7 @@ from Hime.utils import set_nc_value
 
 group_ss = "QGroupBox{border-radius: 5px; border: 2px groove lightgrey; margin-top: 1.2ex;font-family:serif}" \
            "QGroupBox::title {subcontrol-origin: margin;subcontrol-position: top left; left:15px;}"
-
+arc_info = True
 
 ########################################################################################################################
 #
@@ -656,14 +656,14 @@ class VicRun(QWidget):
         global_file = unicode(self.global_file_le.text())
         status, logs_out, logs_err = vic_exec(vic_path, global_file, mpi=use_mpi, n_cores=n_cores)
 
-        vic_logs = []
-        for line in logs_out[-1024:]:
-            vic_logs.append(line)
-        for line in logs_err:
-            vic_logs.append(line)
+        # vic_logs = []
+        # for line in logs_out[-1024:]:
+        #     vic_logs.append(line)
+        # for line in logs_err:
+        #     vic_logs.append(line)
 
-        cursor = self.vic_run_console.textCursor()
-        [cursor.insertText(line) for line in vic_logs]
+        # cursor = self.vic_run_console.textCursor()
+        # [cursor.insertText(line) for line in vic_logs]
 
         self.parent.vic_running = False
 
@@ -1012,7 +1012,7 @@ class Routing(QWidget):
 
     def create_rout_data(self):
         rout_info = {
-            "arc_dir_code": True,
+            "arc_dir_code": arc_info,
             "direc": unicode(self.direc_file_le.text()),
             "veloc": unicode(self.veloc_file_le.text()),
             "diffu": unicode(self.diffu_file_le.text()),
@@ -1783,6 +1783,9 @@ class ForcingCreater(QWidget):
                                         float(self.itp_p3_le.text()),]
         else:
             forcing_params["use_sh"] = None
+        
+        forcing_params['a_s'] = 0.25
+        forcing_params['b_s'] = 0.50
 
         return forcing_params
 
@@ -2048,6 +2051,8 @@ class ParamsCreater(QWidget):
         creater_params = OrderedDict()
         creater_params["soil_file"] = unicode(self.soil_file_le.text())
         creater_params["fract_file"] = unicode(self.fract_file_le.text())
+        if creater_params["fract_file"] == "NULL":
+            creater_params["fract_file"] = NULL
         creater_params["snow_band"] = int(unicode(self.snow_bands_le.text()))
         creater_params["n_layer"] = int(unicode(self.layers_le.text()))
         creater_params["organic"] = False

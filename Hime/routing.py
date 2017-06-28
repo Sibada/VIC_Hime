@@ -64,10 +64,10 @@ def confluence(vic_out_file, rout_data, domain_file, start_date, end_date):
 
     # Runoff yield of mm should transfer to meters and divided by num of seconds in a day to transfer to m^3/s.
     runoff_yield = (runoff + baseflow) * area / 86400000.0
-
+    
     # Convolution.
     daily_runoff = pd.Series(convolution(uh_cell, runoff_yield), index=ts)
-
+    
     return daily_runoff
 
 
@@ -78,6 +78,16 @@ def confluence(vic_out_file, rout_data, domain_file, start_date, end_date):
 ########################################################################################################################
 def gather_to_month(daily_runoff):
     monthly_runoff = daily_runoff.resample("M").mean()
+    return monthly_runoff
+
+
+########################################################################################################################
+#
+# Transfer runoff series from daily series to yearly series.
+#
+########################################################################################################################
+def gather_to_year(daily_runoff):
+    monthly_runoff = daily_runoff.resample("A").mean()
     return monthly_runoff
 
 

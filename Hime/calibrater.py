@@ -10,7 +10,7 @@ import pandas as pd
 
 from Hime import log
 from Hime.uh_creater import load_rout_data
-from Hime.routing import confluence, gather_to_month
+from Hime.routing import confluence, gather_to_month, gather_to_year
 from Hime.statistic import nmse, bias
 from Hime.utils import set_nc_value
 from Hime.vic_execer import vic_exec
@@ -102,6 +102,8 @@ def vic_try(calib_configs):
     sim = sim[calib_start_date: end_date]
     if time_scale == "M":
         sim = gather_to_month(sim)
+    if time_scale == "A":
+        sim = gather_to_year(sim)
 
     # Calculate statistic indexes.
     NMSE = nmse(obs, sim)
@@ -197,6 +199,7 @@ def calibrate(proj, calib_configs):
     })
     proj_calib.global_params["out_file"] = [out_file_calib]
     proj_calib.global_params["param_file"] = calib_configs["params_file"]
+    proj_calib.global_params["domain_file"] = calib_configs["domain_file"]
 
     global_file = proj_path + "global_calibrate.txt"
     vic_out_file = "%sfor_calibrate.%04d-%02d-%02d.nc" % (proj_path,
@@ -281,7 +284,7 @@ def calibrate(proj, calib_configs):
 
                 elif es[0] > es[1] > es[2]:
                     if rcb[p] > -1 and x[2] == rcb[p]:
-                        x[0], rs[0] = x[1]. rs[1]
+                        x[0], rs[0] = x[1], rs[1]
                         x[1] = (x[2] + x[0])/2
                         rs[1] = vic_try_with_param(calib_configs, p, x[1])
                     else:
